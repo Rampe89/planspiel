@@ -8,7 +8,6 @@
 </head>
 <body>
   <main class="app">
-    <!-- TOP HUD -->
     <header class="hud">
       <div class="hudLeft">
         <div class="logo">
@@ -19,8 +18,8 @@
       </div>
 
       <div class="hudRight">
-        <button class="hudBtn" id="btnGlossaryTop" type="button" aria-label="Begriffe öffnen">ℹ️ Begriffe</button>
-        <button class="hudBtn ghost" id="btnResetTop" type="button" aria-label="Reset">↺ Reset</button>
+        <button class="hudBtn" id="btnGlossaryTop" type="button">ℹ️ Begriffe</button>
+        <button class="hudBtn ghost" id="btnResetTop" type="button">↺ Reset</button>
       </div>
     </header>
 
@@ -39,20 +38,27 @@
             </div>
 
             <div class="bubble">
-              <div class="bubbleTitle">Dein Start</div>
+              <div class="bubbleTitle">Story</div>
               <div class="bubbleText" id="storyText"></div>
+            </div>
+
+            <div class="bubble miniBubble">
+              <div class="bubbleTitle">Wie funktioniert’s?</div>
+              <div class="bubbleText">
+                Du wählst Profil + Lifestyle. Daraus entstehen echte Fixkosten + variable Budgets.
+                Dann spielst du 12 Monate mit Entscheidungen, Ereignissen und Markt-Schwankungen.
+              </div>
             </div>
           </div>
         </div>
 
         <div class="panel main">
           <div class="titleBlock">
-            <h1>Erstell dein Profil</h1>
-            <p class="sub">
-              Kurz & knackig. Daraus machen wir Einkommen + realistische Fixkosten.
-            </p>
+            <h1>Profil & Lifestyle</h1>
+            <p class="sub">Je genauer du hier bist, desto realistischer werden deine Monatskosten.</p>
           </div>
 
+          <div class="sectionTitle">1) Profil</div>
           <div class="formGrid">
             <div class="field">
               <label>Lebensweg</label>
@@ -103,18 +109,70 @@
             </div>
           </div>
 
+          <div class="sectionTitle">2) Lifestyle (Konsum)</div>
+          <p class="small">
+            Das sind variable Kosten. Du kannst hier ehrlich wählen – das Spiel reagiert drauf.
+          </p>
+
+          <div class="formGrid">
+            <div class="field">
+              <label>Essen & Trinken</label>
+              <select id="lifeFood">
+                <option value="sparsam">sparsam (Meal Prep)</option>
+                <option value="normal" selected>normal</option>
+                <option value="teuer">teuer (viel To-Go/Lieferung)</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label>Feiern/Freizeit</label>
+              <select id="lifeFun">
+                <option value="low">low</option>
+                <option value="mid" selected>mid</option>
+                <option value="high">high</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label>Kleidung/Shopping</label>
+              <select id="lifeShop">
+                <option value="low">low</option>
+                <option value="mid" selected>mid</option>
+                <option value="high">high</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label>Abos/Streaming</label>
+              <select id="lifeSubs">
+                <option value="none">keine</option>
+                <option value="few" selected>wenige</option>
+                <option value="many">viele</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label>Mobilität</label>
+              <select id="lifeMobility">
+                <option value="ticket" selected>ÖPNV/Deutschlandticket</option>
+                <option value="bike">Fahrrad</option>
+                <option value="car">Auto</option>
+              </select>
+            </div>
+          </div>
+
           <div class="ctaCard">
             <div class="ctaLeft">
               <div class="ctaTitle">Ziel (12 Monate)</div>
               <div class="ctaText">
-                <strong>Notgroschen ≥ 1.000 €</strong> & möglichst <strong>keine roten Monate</strong> (Kontostand nie negativ).
+                <strong>Notgroschen ≥ 1.000 €</strong> & möglichst <strong>keine roten Monate</strong>.
               </div>
             </div>
             <button id="start" class="btn primary" type="button">Starten →</button>
           </div>
 
           <div class="microRow">
-            <span class="microPill">💡 Tipp: Begriffe oben öffnen, wenn ETF/Rate/Zinsen unklar sind.</span>
+            <span class="microPill">💡 Tipp: Wenn’s zu leicht/schwer ist, Lifestyle anpassen und neu starten.</span>
           </div>
         </div>
       </div>
@@ -122,17 +180,18 @@
 
     <!-- SCREEN: GAME -->
     <section class="screen hidden" id="screenGame">
-      <!-- GAME HUD -->
       <div class="gameHud">
         <div class="statCard">
           <div class="statLabel">Monat</div>
           <div class="statValue"><span id="gMonth">1</span><span class="muted">/12</span></div>
         </div>
+
         <div class="statCard">
           <div class="statLabel">Kontostand</div>
           <div class="statValue" id="gBalance">0 €</div>
           <div class="statTiny" id="gBalanceHint"></div>
         </div>
+
         <div class="statCard">
           <div class="statLabel">Netto</div>
           <div class="statValue" id="gIncome">0 €</div>
@@ -173,7 +232,7 @@
       </div>
 
       <div class="layout gameLayout">
-        <!-- LEFT: TIMELINE -->
+        <!-- LEFT -->
         <div class="panel main">
           <div class="panelHead">
             <h2>Monats-Timeline</h2>
@@ -184,38 +243,56 @@
           </div>
 
           <div class="tinyHelp" id="gExplain">
-            Ablauf: Einkommen → Fixkosten → Versicherungen/Kredit → dein Sparplan → Entscheidungskarte → Ereignis → ETF-Schwankung.
+            Action: jeden Monat Entscheidung + Ereignis + ETF-Marktbewegung. Unten siehst du Charts.
           </div>
 
           <div class="timeline" id="gLog"></div>
+
+          <div class="charts">
+            <div class="chartCard">
+              <div class="chartHead">
+                <strong>Kontostand-Verlauf</strong>
+                <span class="chartTiny">12 Monate</span>
+              </div>
+              <canvas id="chartBalance" width="600" height="160"></canvas>
+            </div>
+
+            <div class="chartCard">
+              <div class="chartHead">
+                <strong>ETF-Verlauf</strong>
+                <span class="chartTiny">Schwankt sichtbar</span>
+              </div>
+              <canvas id="chartEtf" width="600" height="160"></canvas>
+            </div>
+          </div>
         </div>
 
-        <!-- RIGHT: DECISIONS -->
+        <!-- RIGHT -->
         <div class="panel side">
           <div class="stack">
             <div class="cardBox">
               <div class="boxHead">
                 <h3>Sparplan</h3>
-                <span class="chip">kurz & klar</span>
+                <span class="chip">monatlich</span>
               </div>
               <p class="small">
-                Du legst Monatsbeträge fest. Wenn nach Fixkosten zu wenig übrig ist, wird automatisch gekürzt.
+                Plan wird nach Fixkosten angewendet. Im Minus wird nicht investiert.
               </p>
 
               <div class="field">
                 <label>Notgroschen (€/Monat)</label>
                 <input id="inpCash" type="number" min="0" step="10" value="100" />
-                <div class="hintLine">Notgroschen = sofort verfügbar für Notfälle.</div>
+                <div class="hintLine">Sofort verfügbar für Notfälle.</div>
               </div>
 
               <div class="field">
                 <label>ETF (€/Monat)</label>
                 <input id="inpEtf" type="number" min="0" step="10" value="100" />
-                <div class="hintLine">ETF = „Korb“ aus vielen Aktien. Schwankt monatlich.</div>
+                <div class="hintLine">ETF schwankt. Risiko/Chance sichtbar im Chart.</div>
               </div>
 
               <div class="subhead">Unterkonten</div>
-              <p class="small">Spar-Töpfe für Ziele (Urlaub, Fahrrad, PC…).</p>
+              <p class="small">Spar-Töpfe für Ziele.</p>
 
               <div id="bucketList" class="bucketList"></div>
 
@@ -230,12 +307,13 @@
             <div class="cardBox">
               <div class="boxHead">
                 <h3>Versicherungen</h3>
-                <span class="chip">Wissen</span>
+                <span class="chip">ohne Spoiler</span>
               </div>
               <p class="small">
-                Versicherungen kosten monatlich Geld. Manche sind sinnvoll – manche eher Marketing.
+                Keine „richtige“ Antwort. Du musst abwägen: laufende Kosten vs. Risiko.
               </p>
               <div id="insuranceList" class="insuranceList"></div>
+              <div class="small" id="insuranceUnlockedHint"></div>
             </div>
 
             <div class="cardBox">
@@ -244,7 +322,7 @@
                 <span class="chip warn">Risiko</span>
               </div>
               <p class="small">
-                Kredit = sofort Geld, aber jeden Monat Rate + Zinsen. Kann helfen – kann dich auch festnageln.
+                Kredit = sofort Geld, aber Rate + Zinsen. Nützlich, wenn’s brennt – gefährlich als Lifestyle.
               </p>
 
               <div class="field">
@@ -275,12 +353,8 @@
       <div class="modalCard">
         <div class="modalTitle" id="choiceTitle">Entscheidung</div>
         <div class="modalText" id="choiceText"></div>
-
         <div class="choiceGrid" id="choiceActions"></div>
-
-        <div class="modalTiny" id="choiceTiny">
-          Jede Runde hat eine Entscheidung. Das ist der Spaß-Teil 🙂
-        </div>
+        <div class="modalTiny">Jede Runde hat eine Entscheidung. Keine perfekte Antwort – nur Konsequenzen 🙂</div>
       </div>
     </div>
 
@@ -289,7 +363,6 @@
       <div class="modalCard">
         <div class="modalTitle" id="eventTitle">Ereignis</div>
         <div class="modalText" id="eventText"></div>
-
         <div class="modalActions">
           <button class="btn primary" id="eventOk" type="button">OK</button>
         </div>
