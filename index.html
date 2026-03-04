@@ -3,21 +3,31 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>MoneyQuest – Prototype</title>
+  <title>MoneyQuest – Planspiel Prototyp</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <main class="app">
     <header class="top">
-      <div class="brand">MoneyQuest</div>
-      <div class="step">Interview → Avatar → Start</div>
+      <div class="brand">
+        <span class="dot"></span>
+        <span>MoneyQuest</span>
+      </div>
+      <div class="step" id="stepText">Interview → Avatar → Start</div>
     </header>
 
-    <section class="card">
+    <!-- SCREEN: INTERVIEW -->
+    <section class="card" id="screenInterview">
       <div class="row">
         <div class="avatarWrap">
-          <canvas id="avatar" width="16" height="16"></canvas>
-          <button id="regen" class="btn ghost">🎲 Avatar neu</button>
+          <canvas id="avatar" width="16" height="16" aria-label="Pixel Avatar"></canvas>
+          <div class="avatarActions">
+            <button id="regen" class="btn ghost" type="button">🎲 Avatar neu</button>
+            <button id="reset" class="btn ghost" type="button">↺ Reset</button>
+          </div>
+          <div class="miniHint">
+            Tipp: Ändere rechts dein Profil – Avatar & Intro passen sich an.
+          </div>
         </div>
 
         <div class="form">
@@ -61,7 +71,7 @@
             <option value="fem">Feminin</option>
           </select>
 
-          <button id="start" class="btn">Starten →</button>
+          <button id="start" class="btn" type="button">Starten →</button>
         </div>
       </div>
 
@@ -70,6 +80,83 @@
         <div id="storyText" class="type"></div>
       </div>
     </section>
+
+    <!-- SCREEN: GAME -->
+    <section class="card hidden" id="screenGame">
+      <div class="gameTop">
+        <div class="pill">
+          <span class="muted">Monat</span>
+          <strong id="gMonth">1</strong>
+        </div>
+        <div class="pill">
+          <span class="muted">Kontostand</span>
+          <strong id="gBalance">0 €</strong>
+        </div>
+        <div class="pill">
+          <span class="muted">Netto</span>
+          <strong id="gIncome">0 €</strong>
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="panel">
+          <h2>Monats-Ablauf</h2>
+          <div class="list" id="gLog"></div>
+
+          <div class="actions">
+            <button class="btn" id="btnRunMonth" type="button">Monat starten</button>
+            <button class="btn ghost" id="btnNextMonth" type="button" disabled>Nächster Monat →</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Deine Entscheidungen</h2>
+
+          <div class="kpiRow">
+            <div class="kpi">
+              <div class="muted">Notgroschen</div>
+              <div class="kpiVal" id="gCash">0 €</div>
+            </div>
+            <div class="kpi">
+              <div class="muted">ETF-Depot</div>
+              <div class="kpiVal" id="gEtf">0 €</div>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>In den Notgroschen einzahlen (€/Monat)</label>
+            <input id="inpCash" type="number" min="0" step="10" value="100" />
+          </div>
+
+          <div class="field">
+            <label>In ETF investieren (€/Monat)</label>
+            <input id="inpEtf" type="number" min="0" step="10" value="100" />
+          </div>
+
+          <div class="hint">
+            Regel: Erst Einkommen/Fixkosten → dann wird verteilt. ETF schwankt monatlich.
+          </div>
+
+          <button class="btn" id="btnApplyPlan" type="button">Plan anwenden</button>
+        </div>
+      </div>
+
+      <div class="footerBar">
+        <button class="btn ghost" id="btnBackToInterview" type="button">← Zurück (Reset)</button>
+      </div>
+    </section>
+
+    <!-- MODAL: EVENT -->
+    <div class="modal hidden" id="eventModal" role="dialog" aria-modal="true">
+      <div class="modalCard">
+        <div class="modalTitle" id="eventTitle">Ereignis</div>
+        <div class="modalText" id="eventText"></div>
+
+        <div class="modalActions" id="eventActions">
+          <button class="btn" id="eventOk" type="button">OK</button>
+        </div>
+      </div>
+    </div>
   </main>
 
   <script src="game.js"></script>
