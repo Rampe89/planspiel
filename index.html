@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>MoneyQuest – Planspiel Prototyp</title>
+  <title>MoneyQuest – Planspiel</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -26,7 +26,7 @@
             <button id="reset" class="btn ghost" type="button">↺ Reset</button>
           </div>
           <div class="miniHint">
-            Tipp: Ändere rechts dein Profil – Avatar & Intro passen sich an.
+            Du startest knapp. Ziel: in <strong>12 Monaten</strong> stabil werden (Notgroschen + wenig Stress).
           </div>
         </div>
 
@@ -76,7 +76,10 @@
       </div>
 
       <div class="story">
-        <h2>Intro</h2>
+        <div class="storyHead">
+          <h2>Intro</h2>
+          <button class="btn ghost small" id="btnGlossary1" type="button">ℹ️ Begriffe</button>
+        </div>
         <div id="storyText" class="type"></div>
       </div>
     </section>
@@ -87,6 +90,7 @@
         <div class="pill">
           <span class="muted">Monat</span>
           <strong id="gMonth">1</strong>
+          <span class="muted">/ 12</span>
         </div>
         <div class="pill">
           <span class="muted">Kontostand</span>
@@ -96,11 +100,25 @@
           <span class="muted">Netto</span>
           <strong id="gIncome">0 €</strong>
         </div>
+
+        <div class="topActions">
+          <button class="btn ghost small" id="btnGlossary2" type="button">ℹ️ Begriffe</button>
+          <button class="btn ghost small" id="btnBackToInterview" type="button">↺ Reset</button>
+        </div>
       </div>
 
       <div class="grid2">
+        <!-- LEFT: FLOW -->
         <div class="panel">
-          <h2>Monats-Ablauf</h2>
+          <div class="panelHead">
+            <h2>Monat (Was passiert?)</h2>
+            <span class="tag" id="phaseTag">bereit</span>
+          </div>
+
+          <div class="hint" id="gExplain">
+            Klick <strong>Monat starten</strong>: Einkommen kommt rein → Fixkosten gehen ab → dann kannst du verteilen (Sparen/ETF). Danach passiert ein Ereignis.
+          </div>
+
           <div class="list" id="gLog"></div>
 
           <div class="actions">
@@ -109,6 +127,7 @@
           </div>
         </div>
 
+        <!-- RIGHT: DECISIONS -->
         <div class="panel">
           <h2>Deine Entscheidungen</h2>
 
@@ -116,33 +135,88 @@
             <div class="kpi">
               <div class="muted">Notgroschen</div>
               <div class="kpiVal" id="gCash">0 €</div>
+              <div class="micro">Sofort verfügbar für Notfälle.</div>
             </div>
             <div class="kpi">
               <div class="muted">ETF-Depot</div>
               <div class="kpiVal" id="gEtf">0 €</div>
+              <div class="micro">Schwankt. Langfristig gedacht.</div>
             </div>
           </div>
 
+          <div class="subhead">Unterkonten (Sparziele)</div>
+          <div class="mini">
+            Unterkonten helfen dir zu planen (z. B. Urlaub, Auto). Sie sind wie „Töpfe“.
+          </div>
+
+          <div id="bucketList" class="bucketList"></div>
+
+          <div class="bucketAdd">
+            <input id="newBucketName" type="text" maxlength="18" placeholder="z. B. Urlaub" />
+            <button id="btnAddBucket" class="btn ghost" type="button">+ Konto</button>
+          </div>
+
+          <div class="subhead">Monatsplan</div>
+          <div class="mini">
+            Du legst fest, wie viel du pro Monat in Notgroschen, ETF und Unterkonten stecken willst.
+            Wenn du es dir nicht leisten kannst, wird automatisch gekürzt.
+          </div>
+
           <div class="field">
-            <label>In den Notgroschen einzahlen (€/Monat)</label>
+            <label>Notgroschen einzahlen (€/Monat)</label>
             <input id="inpCash" type="number" min="0" step="10" value="100" />
           </div>
 
           <div class="field">
-            <label>In ETF investieren (€/Monat)</label>
+            <label>ETF investieren (€/Monat)</label>
             <input id="inpEtf" type="number" min="0" step="10" value="100" />
           </div>
 
-          <div class="hint">
-            Regel: Erst Einkommen/Fixkosten → dann wird verteilt. ETF schwankt monatlich.
+          <button class="btn" id="btnApplyPlan" type="button">Plan speichern</button>
+
+          <hr class="sep" />
+
+          <h2>Versicherungen</h2>
+          <div class="mini">
+            Versicherungen sind laufende Kosten. Sie schützen vor großen Schäden – aber nicht jede ist sinnvoll.
+          </div>
+          <div id="insuranceList" class="insuranceList"></div>
+
+          <hr class="sep" />
+
+          <h2>Kredit</h2>
+          <div class="mini">
+            Ein Kredit gibt dir sofort Geld, aber du zahlst jeden Monat eine Rate + Zinsen.
+            Das kann helfen – oder dich dauerhaft belasten.
           </div>
 
-          <button class="btn" id="btnApplyPlan" type="button">Plan anwenden</button>
+          <div class="creditBox">
+            <div class="field">
+              <label>Betrag (einmalig aufs Konto)</label>
+              <input id="loanAmount" type="number" min="0" step="100" value="0" />
+            </div>
+
+            <div class="field">
+              <label>Laufzeit (Monate)</label>
+              <input id="loanMonths" type="number" min="6" step="6" value="12" />
+            </div>
+
+            <div class="field">
+              <label>Zins (p. a.)</label>
+              <input id="loanApr" type="number" min="0" step="0.5" value="8" />
+            </div>
+
+            <button class="btn ghost" id="btnTakeLoan" type="button">Kredit aufnehmen</button>
+
+            <div class="mini">
+              Aktiver Kredit: <strong id="loanStatus">kein Kredit</strong>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div class="footerBar">
-        <button class="btn ghost" id="btnBackToInterview" type="button">← Zurück (Reset)</button>
+      <div class="footerNote" id="goalNote">
+        Zielvorschlag: <strong>Notgroschen ≥ 1.000 €</strong> und <strong>keine roten Monate</strong> (Kontostand nie negativ).
       </div>
     </section>
 
@@ -155,6 +229,17 @@
         <div class="modalActions" id="eventActions">
           <button class="btn" id="eventOk" type="button">OK</button>
         </div>
+      </div>
+    </div>
+
+    <!-- DRAWER: GLOSSARY -->
+    <div class="drawer hidden" id="glossaryDrawer" aria-hidden="true">
+      <div class="drawerCard">
+        <div class="drawerHead">
+          <strong>Begriffe – kurz erklärt</strong>
+          <button class="btn ghost small" id="btnCloseGlossary" type="button">✕</button>
+        </div>
+        <div class="drawerBody" id="glossaryContent"></div>
       </div>
     </div>
   </main>
