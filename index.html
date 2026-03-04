@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>MoneyQuest – Prototype</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="app">
+    <header class="top">
+      <div class="brand">MoneyQuest</div>
+      <div class="step">Interview → Avatar → Start</div>
+    </header>
+
+    <section class="card">
+      <div class="row">
+        <div class="avatarWrap">
+          <canvas id="avatar" width="16" height="16"></canvas>
+          <button id="regen" class="btn ghost">🎲 Avatar neu</button>
+        </div>
+
+        <div class="form">
+          <h1>Dein Profil</h1>
+
+          <label>Lebensweg</label>
+          <select id="path">
+            <option value="ausbildung">Ausbildung</option>
+            <option value="studium">Studium</option>
+            <option value="job">Direkt im Job</option>
+          </select>
+
+          <label>Berufsfeld</label>
+          <select id="field">
+            <option value="it">IT</option>
+            <option value="pflege">Pflege</option>
+            <option value="handwerk">Handwerk</option>
+            <option value="buero">Büro</option>
+            <option value="einzelhandel">Einzelhandel</option>
+          </select>
+
+          <label>Wohnsituation</label>
+          <select id="living">
+            <option value="wg">WG</option>
+            <option value="miete">Mietwohnung</option>
+            <option value="eltern">Bei Eltern</option>
+            <option value="eigentum">Eigentum</option>
+          </select>
+
+          <label>Familie</label>
+          <select id="family">
+            <option value="single">Single</option>
+            <option value="partner">Partner:in</option>
+            <option value="kind">Kind(er)</option>
+          </select>
+
+          <label>Stil</label>
+          <select id="style">
+            <option value="neutral">Neutral</option>
+            <option value="masc">Maskulin</option>
+            <option value="fem">Feminin</option>
+          </select>
+
+          <button id="start" class="btn">Starten →</button>
+        </div>
+      </div>
+
+      <div class="story">
+        <h2>Intro</h2>
+        <div id="storyText" class="type"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="game.js"></script>
+</body>
+</html>
