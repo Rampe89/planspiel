@@ -153,11 +153,27 @@ function buildStory(p){
   ].join(" ");
 }
 
-async function typeText(node, text){
+let typingController = null;
+
+async function typeText(node, text) {
+
+  if (typingController) {
+    typingController.abort();
+  }
+
+  typingController = new AbortController();
+  const signal = typingController.signal;
+
   node.textContent = "";
-  const speed = 14; // ms per char
-  for(let i=0;i<text.length;i++){
+
+  const speed = 14;
+
+  for (let i = 0; i < text.length; i++) {
+
+    if (signal.aborted) return;
+
     node.textContent += text[i];
+
     await new Promise(r => setTimeout(r, speed));
   }
 }
