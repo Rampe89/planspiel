@@ -1,33 +1,40 @@
-/* MoneyQuest – B (playful) + weniger langweilig
-   NEW:
-   - HUD + Stabilität (0..100)
-   - Notgroschen-Quest Progressbar
-   - Jeden Monat 1 Choice Card (2 Optionen) -> echte Entscheidung
-   - Achievements (Toasts)
-   - Timeline statt „Logbox“
-   - Fixkosten + Erklärungen bleiben drin
+/* MoneyQuest – polish pass
+   Changes:
+   - Extended interview incl. lifestyle -> variable budgets
+   - Charts (balance + ETF) for action/visualization
+   - ETF volatility improved (normal-ish + occasional shock)
+   - Insurance tips less "spoiler": categories only; hints unlock after events
 */
 
 const el = (id) => document.getElementById(id);
 
-// ------------------ Helpers ------------------
+// ---------- helpers ----------
 function formatEUR(n){
   const v = Math.round(n);
   const s = v.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
   return `${s} €`;
 }
-function clamp(n, a, b){ return Math.max(a, Math.min(b, n)); }
+function clamp(n,a,b){ return Math.max(a, Math.min(b,n)); }
 function uid(){ return Math.random().toString(16).slice(2,10); }
+function rand(min,max){ return min + Math.random()*(max-min); }
 
-// ------------------ Glossary ------------------
+// Box-Muller normal
+function randn(){
+  let u = 0, v = 0;
+  while(u === 0) u = Math.random();
+  while(v === 0) v = Math.random();
+  return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+}
+
+// ---------- glossary ----------
 const GLOSSARY = [
-  { title:"Fixkosten", text:"Kosten, die jeden Monat (fast) gleich sind (Miete, Internet, Handy…)", small:"Fixkosten laufen auch dann, wenn du nichts kaufst."},
-  { title:"Variable Kosten", text:"Kosten, die schwanken (Freizeit, Snacks, Reparaturen…)", small:"Variabel = mehr Kontrolle, aber auch mehr Risiko."},
-  { title:"Notgroschen", text:"Geld nur für Notfälle (Waschmaschine, Fahrrad, Arztkosten).", small:"Erst Notgroschen, dann Luxus."},
-  { title:"ETF", text:"Ein ETF ist ein Korb aus vielen Aktien. Du kaufst Anteile. Der Wert schwankt.", small:"Kurzfristig wackelig, langfristig oft sinnvoll."},
-  { title:"Zinsen", text:"Beim Kredit zahlst du extra Geld für geliehenes Geld.", small:"Kredit-Zinsen sind meistens höher als Spar-Zinsen."},
-  { title:"Rate", text:"Betrag, der monatlich für einen Kredit fällig wird (inkl. Zinsen).", small:"Viele kleine Raten = Dauerbelastung."},
-  { title:"Stabilität", text:"Spielwert 0–100: wie gut du finanziell aufgestellt bist.", small:"Steigt mit Notgroschen & Planung, sinkt bei Minus & Risiken."},
+  { title:"Fixkosten", text:"Kosten, die jeden Monat (fast) gleich sind (Miete, Internet, Handy…).", small:"Fixkosten laufen auch dann, wenn du nichts kaufst."},
+  { title:"Variable Kosten", text:"Kosten, die schwanken (Freizeit, Snacks, Reparaturen…).", small:"Variabel = mehr Kontrolle, aber auch mehr Risiko."},
+  { title:"Notgroschen", text:"Geld nur für Notfälle (Waschmaschine, Arztkosten).", small:"Erst Notgroschen, dann Luxus."},
+  { title:"ETF", text:"ETF = Korb aus vielen Aktien. Du kaufst Anteile, der Wert schwankt.", small:"Im Spiel schwankt ETF sichtbar (auch negativ)."},
+  { title:"Zinsen", text:"Kredit kostet extra Geld (Zinsen).", small:"Zinsen machen Kredite teuer."},
+  { title:"Rate", text:"Monatlicher Betrag für Kredit/Ratenkauf.", small:"Viele kleine Raten nerven langfristig."},
+  { title:"Volatilität", text:"Wie stark etwas schwankt. Aktien/ETFs schwanken mehr als Sparbuch.", small:"Mehr Schwankung = mehr Risiko, aber auch Chance."},
 ];
 
 function openGlossary(){
@@ -46,7 +53,7 @@ function closeGlossary(){
   el("glossaryDrawer").setAttribute("aria-hidden","true");
 }
 
-// ------------------ Toast / Achievements ------------------
+// ---------- toast ----------
 let toastTimer = null;
 function toast(title, text){
   el("toastTitle").textContent = title;
@@ -55,14 +62,13 @@ function toast(title, text){
   if(toastTimer) clearTimeout(toastTimer);
   toastTimer = setTimeout(()=> el("toast").classList.add("hidden"), 2600);
 }
-
 function award(g, id, title, text){
   if(g.achievements.has(id)) return;
   g.achievements.add(id);
   toast(`🏆 ${title}`, text);
 }
 
-// ------------------ Interview/Profile ------------------
+// ---------- interview ----------
 function getProfile(){
   return {
     path: el("path").value,
@@ -70,35 +76,23 @@ function getProfile(){
     living: el("living").value,
     family: el("family").value,
     style: el("style").value,
+
+    lifeFood: el("lifeFood").value,
+    lifeFun: el("lifeFun").value,
+    lifeShop: el("lifeShop").value,
+    lifeSubs: el("lifeSubs").value,
+    lifeMobility: el("lifeMobility").value,
   };
 }
-
 function buildStory(p){
   const pathText = p.path === "ausbildung" ? "in der Ausbildung" : (p.path === "studium" ? "im Studium" : "im Job");
   const fieldText = ({it:"in der IT", pflege:"in der Pflege", handwerk:"im Handwerk", buero:"im Büro", einzelhandel:"im Einzelhandel"})[p.field] || "im Beruf";
   const livingText = ({wg:"in einer WG", miete:"in einer Mietwohnung", eltern:"bei deinen Eltern", eigentum:"in deinem Eigentum"})[p.living] || "irgendwo";
-  const familyText = (p.family === "single") ? "Du bist allein unterwegs." : (p.family === "partner" ? "Du lebst mit Partner:in." : "Du hast Verantwortung für ein Kind.");
-  return `Du bist ${pathText} ${fieldText} und wohnst ${livingText}. ${familyText} Ziel: Notgroschen aufbauen & nicht ins Minus rutschen.`;
+  const familyText = (p.family === "single") ? "Solo unterwegs." : (p.family === "partner" ? "Mit Partner:in." : "Mit Kind-Verantwortung.");
+  return `Du bist ${pathText} ${fieldText} und wohnst ${livingText}. ${familyText} Lifestyle beeinflusst deine variablen Kosten.`;
 }
 
-// ------------------ Typewriter (mit Abbruch) ------------------
-let typingController = null;
-async function typeText(node, text){
-  if (typingController) typingController.abort();
-  typingController = new AbortController();
-  const signal = typingController.signal;
-
-  node.textContent = "";
-  const speed = 9;
-
-  for(let i=0;i<text.length;i++){
-    if(signal.aborted) return;
-    node.textContent += text[i];
-    await new Promise(r => setTimeout(r, speed));
-  }
-}
-
-// ------------------ Avatar (pixel) ------------------
+// ---------- avatar ----------
 function xmur3(str){
   let h = 1779033703 ^ str.length;
   for (let i = 0; i < str.length; i++){
@@ -121,7 +115,7 @@ function mulberry32(a){
   };
 }
 function profileSeed(p, salt=0){
-  return `${p.path}|${p.field}|${p.living}|${p.family}|${p.style}|${salt}`;
+  return `${p.path}|${p.field}|${p.living}|${p.family}|${p.style}|${p.lifeFood}|${p.lifeFun}|${p.lifeShop}|${p.lifeSubs}|${p.lifeMobility}|${salt}`;
 }
 function pick(rng, arr){ return arr[Math.floor(rng()*arr.length)]; }
 
@@ -138,14 +132,9 @@ function drawAvatar(profile, salt=0){
   const pantsColors = ["#334155","#0F172A","#475569","#1F2937"];
 
   const skin = pick(rng, skinTones);
-  let hair = pick(rng, hairColors);
-  let shirt = pick(rng, shirtColors);
-  let pants = pick(rng, pantsColors);
-
-  if(profile.field === "it") shirt = "#06B6D4";
-  if(profile.field === "pflege") shirt = "#22C55E";
-  if(profile.field === "handwerk") shirt = "#F97316";
-  if(profile.field === "buero") shirt = "#7C3AED";
+  const hair = pick(rng, hairColors);
+  const shirt = pick(rng, shirtColors);
+  const pants = pick(rng, pantsColors);
 
   const hairStyle =
     (profile.style === "fem") ? "long" :
@@ -161,15 +150,10 @@ function drawAvatar(profile, salt=0){
   px(7,5,"#111827"); px(9,5,"#111827");
   px(8,7,"#7C2D12");
 
-  if(hairStyle === "short"){
-    rect(5,2,6,2,hair); px(5,4,hair); px(10,4,hair);
-  } else if(hairStyle === "long"){
-    rect(5,2,6,2,hair); rect(4,4,1,4,hair); rect(11,4,1,4,hair); rect(5,4,6,1,hair);
-  } else if(hairStyle === "cap"){
-    rect(5,2,6,2,"#111827"); rect(4,3,8,1,"#111827");
-  } else {
-    rect(5,2,6,2,hair); px(4,3,hair); px(11,3,hair); px(6,4,hair); px(9,4,hair);
-  }
+  if(hairStyle === "short"){ rect(5,2,6,2,hair); px(5,4,hair); px(10,4,hair); }
+  else if(hairStyle === "long"){ rect(5,2,6,2,hair); rect(4,4,1,4,hair); rect(11,4,1,4,hair); rect(5,4,6,1,hair); }
+  else if(hairStyle === "cap"){ rect(5,2,6,2,"#111827"); rect(4,3,8,1,"#111827"); }
+  else { rect(5,2,6,2,hair); px(4,3,hair); px(11,3,hair); px(6,4,hair); px(9,4,hair); }
 
   rect(5,9,6,4,shirt);
   rect(4,10,1,2,skin); rect(11,10,1,2,skin);
@@ -177,7 +161,7 @@ function drawAvatar(profile, salt=0){
   px(6,15,"#0B1220"); px(9,15,"#0B1220");
 }
 
-// ------------------ Economy ------------------
+// ---------- economy ----------
 const JOB_NET = {
   it:          { ausbildung: 1600, studium: 2300, job: 2800 },
   pflege:      { ausbildung: 1550, studium: 2000, job: 2450 },
@@ -199,31 +183,43 @@ function familyCosts(family){
   return 0;
 }
 
-// ------------------ Insurance ------------------
+function lifestyleBudgets(p){
+  // variable budgets derived from lifestyle, not fixed
+  const food = (p.lifeFood === "sparsam") ? 230 : (p.lifeFood === "teuer" ? 380 : 290);
+  const fun  = (p.lifeFun === "low") ? 60 : (p.lifeFun === "high" ? 220 : 120);
+  const shop = (p.lifeShop === "low") ? 20 : (p.lifeShop === "high" ? 140 : 60);
+  const subs = (p.lifeSubs === "none") ? 0 : (p.lifeSubs === "many" ? 45 : 18);
+
+  let mobility = 0;
+  let hasCar = false;
+  if(p.lifeMobility === "ticket") mobility = 49;
+  if(p.lifeMobility === "bike") mobility = 12; // maintenance
+  if(p.lifeMobility === "car"){
+    hasCar = true;
+    mobility = 190; // fuel/maintenance baseline
+  }
+  return { food, fun, shop, subs, mobility, hasCar };
+}
+
+// ---------- insurance (no spoiler labels) ----------
 const INSURANCE = [
-  { id:"haftpflicht", name:"Haftpflicht", price:6, tier:"good",
-    short:"Sinnvoll",
-    desc:"Zahlt, wenn du aus Versehen fremde Sachen kaputt machst."
+  { id:"haftpflicht", name:"Haftpflicht", price:6, cat:"Basis", badge:"base",
+    hint:"Schützt gegen Schäden an anderen. (Details später im Spiel.)"
   },
-  { id:"hausrat", name:"Hausrat", price:12, tier:"ok",
-    short:"Optional",
-    desc:"Schützt Dinge in der Wohnung (Einbruch/Brand). In WG oft weniger wichtig."
+  { id:"hausrat", name:"Hausrat", price:12, cat:"Komfort", badge:"comfort",
+    hint:"Schützt Dinge in der Wohnung. (Details später im Spiel.)"
   },
-  { id:"handy", name:"Handyversicherung", price:15, tier:"meh",
-    short:"Oft überflüssig",
-    desc:"Klingt gut, ist aber oft teuer und hat Ausschlüsse/Selbstbeteiligung."
+  { id:"handy", name:"Handyversicherung", price:15, cat:"Risiko", badge:"risk",
+    hint:"Schutz fürs Handy. (Details später im Spiel.)"
   },
-  { id:"rechtsschutz", name:"Rechtsschutz", price:18, tier:"ok",
-    short:"Optional",
-    desc:"Kann helfen, wenn es rechtlich knallt. Für Startphase oft nicht nötig."
+  { id:"rechtsschutz", name:"Rechtsschutz", price:18, cat:"Komfort", badge:"comfort",
+    hint:"Hilft bei Rechtsstreit. (Details später im Spiel.)"
   },
 ];
 
 function insuranceSum(g){
   let sum = 0;
-  for(const ins of INSURANCE){
-    if(g.insurance[ins.id]) sum += ins.price;
-  }
+  for(const ins of INSURANCE) if(g.insurance[ins.id]) sum += ins.price;
   return sum;
 }
 
@@ -232,7 +228,6 @@ function renderInsuranceList(g){
   root.innerHTML = "";
   for(const ins of INSURANCE){
     const on = !!g.insurance[ins.id];
-    const badgeClass = ins.tier === "good" ? "good" : (ins.tier === "ok" ? "ok" : "meh");
     const div = document.createElement("div");
     div.className = "insItem";
     div.innerHTML = `
@@ -240,8 +235,8 @@ function renderInsuranceList(g){
         <div class="insName">${ins.name}</div>
         <div class="insPrice">${formatEUR(ins.price)}/Monat</div>
       </div>
-      <div class="badge ${badgeClass}">${ins.short}</div>
-      <div class="insDesc">${ins.desc}</div>
+      <div class="badge ${ins.badge}">${ins.cat}</div>
+      <div class="insDesc">${ins.hint}</div>
       <label class="insToggle">
         <input type="checkbox" data-ins="${ins.id}" ${on ? "checked":""}/>
         Aktivieren
@@ -254,36 +249,49 @@ function renderInsuranceList(g){
       const id = e.target.getAttribute("data-ins");
       g.insurance[id] = e.target.checked;
       timelineClear();
-      timelineInfo("Versicherung geändert", "Aktive Versicherungen erhöhen Fixkosten – können dich aber vor großen Schäden schützen.");
+      timelineInfo("Versicherung geändert", "Abwägung: monatliche Kosten vs. Risiko. Infos schalten sich durch Ereignisse frei.");
       renderGame();
     });
   });
+
+  const unlocked = [...g.insuranceHints];
+  el("insuranceUnlockedHint").textContent = unlocked.length
+    ? "Freigeschaltete Hinweise: " + unlocked.join(" • ")
+    : "Hinweise werden durch passende Ereignisse freigeschaltet.";
 }
 
-// ------------------ Loan ------------------
+// ---------- loan ----------
 function calcMonthlyRate(amount, months, apr){
   if(amount <= 0) return 0;
   const r = (apr/100) / 12;
   if(r === 0) return amount / months;
-  const rate = amount * (r * Math.pow(1+r, months)) / (Math.pow(1+r, months)-1);
-  return rate;
+  return amount * (r * Math.pow(1+r, months)) / (Math.pow(1+r, months)-1);
 }
 
-// ------------------ Events ------------------
-const EVENT_DECK = [
-  { title:"Waschmaschine kaputt", text:"Klassischer Notfall. Reparatur/Ersatz: 350 €.", delta:-350 },
-  { title:"Fahrrad geklaut", text:"Ohne Rücklagen nervig: 180 €.", delta:-180 },
-  { title:"Nebenjob", text:"Du hilfst beim Umzug: +120 €.", delta:+120 },
-  { title:"Handy-Display", text:"Reparatur: 140 €.", delta:-140 },
-  { title:"Geburtstag", text:"+80 € Geschenk.", delta:+80 },
-  { title:"Arztkosten", text:"Zuzahlung/Medikamente: 35 €.", delta:-35 },
+// ---------- events ----------
+const EVENT_DECK_BASE = [
+  { key:"washer", title:"Waschmaschine kaputt", text:"Reparatur/Ersatz: 350 €.", delta:-350 },
+  { key:"bike", title:"Fahrrad geklaut", text:"Ersatz: 180 €.", delta:-180 },
+  { key:"sidejob", title:"Nebenjob", text:"+120 € (Umzug helfen).", delta:+120 },
+  { key:"phone", title:"Handy-Display", text:"Reparatur: 140 €.", delta:-140 },
+  { key:"gift", title:"Geburtstag", text:"+80 € Geschenk.", delta:+80 },
+  { key:"doctor", title:"Arztkosten", text:"Zuzahlung: 35 €.", delta:-35 },
 ];
+
+function buildEventDeck(hasCar){
+  const deck = [...EVENT_DECK_BASE];
+  if(hasCar){
+    deck.push({ key:"car_repair", title:"Auto: Reparatur", text:"Werkstatt: 420 €.", delta:-420 });
+    deck.push({ key:"car_ticket", title:"Auto: Knöllchen", text:"Falsch geparkt: 25 €.", delta:-25 });
+  }
+  return deck;
+}
 
 function quarterlyCosts(month){
   if(month % 3 !== 0) return [];
   return [
     { label:"GEZ (Quartal)", amount: -55, why:"Viele Haushalte zahlen quartalsweise." },
-    { label:"Periodische Kosten", amount: -120, why:"Stellvertretend für Kosten, die nicht monatlich kommen." },
+    { label:"Periodische Kosten", amount: -120, why:"Kosten, die nicht monatlich kommen." },
   ];
 }
 
@@ -291,7 +299,6 @@ function showEventModal(ev, onClose){
   el("eventTitle").textContent = ev.title;
   el("eventText").textContent = `${ev.text} (${ev.delta >= 0 ? "+" : ""}${formatEUR(ev.delta).replace(" €","")} €)`;
   el("eventModal").classList.remove("hidden");
-
   const ok = el("eventOk");
   const handler = () => {
     ok.removeEventListener("click", handler);
@@ -301,35 +308,36 @@ function showEventModal(ev, onClose){
   ok.addEventListener("click", handler);
 }
 
-function drawRandomEvent(){
-  return EVENT_DECK[Math.floor(Math.random()*EVENT_DECK.length)];
+function drawRandomEvent(g){
+  const deck = g.eventDeck;
+  return deck[Math.floor(Math.random()*deck.length)];
 }
 
-// ------------------ Choice Cards (jeden Monat) ------------------
+// ---------- choices ----------
 const CHOICES = [
   {
     title: "Essen & Trinken",
-    text: "Du merkst: Am Ende des Monats wird Essen teuer. Was machst du?",
-    a: { label:"Meal Prep", meta:"Du kochst 2× vor. Spart Geld, kostet Zeit.", money:+80, stability:+6 },
-    b: { label:"Lieferando", meta:"Bequem, aber teuer.", money:-80, stability:-4 },
-  },
-  {
-    title: "Transport",
-    text: "Du brauchst Mobilität. Entscheidung?",
-    a: { label:"Monatsticket", meta:"Planbar, sicher.", money:-49, stability:+4 },
-    b: { label:"Risiko", meta:"Du sparst, aber 15% Chance auf Strafe (60€).", money:+49, stability:-3, risk:{p:0.15, hit:-60} },
-  },
-  {
-    title: "Handy",
-    text: "Dein Handy macht Ärger. Was ist dein Move?",
-    a: { label:"Reparieren", meta:"Einmal zahlen, dann Ruhe.", money:-140, stability:+3 },
-    b: { label:"Ratenkauf", meta:"12× 14€ (klein, aber dauerhaft).", money:0, stability:-2, recurring:{months:12, amount:-14, label:"Handy-Rate"} },
+    text: "Du merkst: Essen kippt den Monat. Was machst du?",
+    a: { label:"Meal Prep", meta:"Planen & vorkochen.", money:+70, stability:+6 },
+    b: { label:"To-Go/Lieferung", meta:"Bequem, teuer.", money:-70, stability:-4 },
   },
   {
     title: "Freizeit",
-    text: "Du willst raus. Was machst du?",
-    a: { label:"Budget-Plan", meta:"Günstig, aber okay.", money:+40, stability:+5 },
-    b: { label:"All-in", meta:"Macht Spaß, kostet aber.", money:-60, stability:-3 },
+    text: "Du willst was erleben. Entscheidung?",
+    a: { label:"Budget", meta:"Günstig, aber nice.", money:+40, stability:+5 },
+    b: { label:"All-in", meta:"Spaß, kostet.", money:-60, stability:-3 },
+  },
+  {
+    title: "Shopping",
+    text: "Sale everywhere. Was passiert?",
+    a: { label:"Wunschliste", meta:"Nur 1 Teil kaufen.", money:+30, stability:+3 },
+    b: { label:"Spontan", meta:"3 Teile + Accessoires.", money:-90, stability:-4 },
+  },
+  {
+    title: "Abo-Falle",
+    text: "Du merkst: Abos fressen Geld. Move?",
+    a: { label:"Kündigen", meta:"2 Abos weg.", money:+18, stability:+4 },
+    b: { label:"Ignorieren", meta:"Bleibt so.", money:0, stability:-2 },
   },
 ];
 
@@ -340,46 +348,34 @@ function showChoiceModal(choice, onPick){
   const wrap = el("choiceActions");
   wrap.innerHTML = "";
 
-  const mk = (optKey, opt) => {
+  const mk = (opt) => {
     const btn = document.createElement("button");
     btn.className = "choiceBtn";
     btn.type = "button";
-    const impactPills = [];
 
-    if(opt.money !== 0){
-      impactPills.push(`<span class="pill ${opt.money>=0?'good':'bad'}">${opt.money>=0?'+':''}${formatEUR(opt.money).replace(' €','')}€</span>`);
-    } else {
-      impactPills.push(`<span class="pill neu">0€</span>`);
-    }
-    if(opt.stability){
-      impactPills.push(`<span class="pill ${opt.stability>=0?'good':'bad'}">${opt.stability>=0?'+':''}${opt.stability} Stabilität</span>`);
-    }
-    if(opt.risk){
-      impactPills.push(`<span class="pill neu">${Math.round(opt.risk.p*100)}% Risiko</span>`);
-    }
-    if(opt.recurring){
-      impactPills.push(`<span class="pill neu">Rate ${Math.abs(opt.recurring.amount)}€/Monat</span>`);
-    }
+    const pills = [];
+    pills.push(`<span class="pill ${opt.money>=0?'good':'bad'}">${opt.money>=0?'+':''}${formatEUR(opt.money).replace(' €','')}€</span>`);
+    pills.push(`<span class="pill ${opt.stability>=0?'good':'bad'}">${opt.stability>=0?'+':''}${opt.stability} Stabilität</span>`);
 
     btn.innerHTML = `
       <div class="choiceTitle">${opt.label}</div>
       <div class="choiceMeta">${opt.meta}</div>
-      <div class="choiceImpact">${impactPills.join("")}</div>
+      <div class="choiceImpact">${pills.join("")}</div>
     `;
     btn.addEventListener("click", () => {
       el("choiceModal").classList.add("hidden");
-      onPick(optKey, opt);
+      onPick(opt);
     });
     return btn;
   };
 
-  wrap.appendChild(mk("a", choice.a));
-  wrap.appendChild(mk("b", choice.b));
+  wrap.appendChild(mk(choice.a));
+  wrap.appendChild(mk(choice.b));
 
   el("choiceModal").classList.remove("hidden");
 }
 
-// ------------------ Timeline UI ------------------
+// ---------- timeline ----------
 function timelineClear(){ el("gLog").innerHTML = ""; }
 
 function timelineItem(title, amount, sub, dotColor=null){
@@ -420,35 +416,123 @@ function timelineInfo(title, sub){
   timelineItem(title, 0, sub, "#06B6D4");
 }
 
-// ------------------ Game State ------------------
+// ---------- charts ----------
+function drawLineChart(canvasId, values, labelMax=null){
+  const c = el(canvasId);
+  const ctx = c.getContext("2d");
+  const w = c.width, h = c.height;
+
+  ctx.clearRect(0,0,w,h);
+
+  // padding
+  const padL = 34, padR = 10, padT = 14, padB = 18;
+  const plotW = w - padL - padR;
+  const plotH = h - padT - padB;
+
+  const minV = Math.min(...values, 0);
+  const maxV = Math.max(...values, 1);
+  const range = (maxV - minV) || 1;
+
+  // background grid
+  ctx.globalAlpha = 1;
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = "rgba(15,23,42,.08)";
+  for(let i=0;i<=4;i++){
+    const y = padT + (plotH * i/4);
+    ctx.beginPath();
+    ctx.moveTo(padL, y);
+    ctx.lineTo(padL + plotW, y);
+    ctx.stroke();
+  }
+
+  // axis labels (min/max)
+  ctx.fillStyle = "rgba(15,23,42,.55)";
+  ctx.font = "12px system-ui";
+  const topLabel = labelMax ?? Math.round(maxV);
+  const botLabel = Math.round(minV);
+  ctx.fillText(`${topLabel}`, 6, padT+10);
+  ctx.fillText(`${botLabel}`, 6, padT+plotH);
+
+  // line
+  ctx.strokeStyle = "rgba(124,58,237,.95)";
+  ctx.lineWidth = 3;
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+
+  const xAt = (i)=> padL + (plotW * (values.length === 1 ? 0 : i/(values.length-1)));
+  const yAt = (v)=> padT + plotH - ((v - minV)/range)*plotH;
+
+  ctx.beginPath();
+  values.forEach((v,i)=>{
+    const x = xAt(i);
+    const y = yAt(v);
+    if(i===0) ctx.moveTo(x,y);
+    else ctx.lineTo(x,y);
+  });
+  ctx.stroke();
+
+  // points
+  values.forEach((v,i)=>{
+    const x = xAt(i);
+    const y = yAt(v);
+    ctx.fillStyle = "rgba(34,197,94,.95)";
+    ctx.beginPath();
+    ctx.arc(x,y,4,0,Math.PI*2);
+    ctx.fill();
+  });
+
+  // zero line if range crosses 0
+  if(minV < 0 && maxV > 0){
+    const y0 = yAt(0);
+    ctx.strokeStyle = "rgba(239,68,68,.35)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(padL, y0);
+    ctx.lineTo(padL+plotW, y0);
+    ctx.stroke();
+  }
+}
+
+// ---------- state ----------
 const state = { salt:0, profile:null, game:null };
 
 function newGame(profile){
   const income = JOB_NET[profile.field]?.[profile.path] ?? 1700;
   const living = LIVING[profile.living] ?? LIVING.wg;
 
+  const life = lifestyleBudgets(profile);
+
   return {
     month: 1,
     balance: 350,
     income,
 
+    // fixed
     fixed: {
       rent: living.rent,
       utilities: living.utilities,
-      food: 290,
-      household: 60,
-      phone: 20,
       internet: living.internet,
-      transport: (profile.living === "wg" ? 49 : 69),
-      clothing: 35,
+      phone: 20,
       family: familyCosts(profile.family),
     },
 
+    // variable budgets (come from interview)
+    variable: {
+      food: life.food,
+      fun: life.fun,
+      shop: life.shop,
+      subs: life.subs,
+      mobility: life.mobility,
+    },
+
+    hasCar: life.hasCar,
+    eventDeck: buildEventDeck(life.hasCar),
+
     insurance: { haftpflicht:true, hausrat:false, handy:false, rechtsschutz:false },
+    insuranceHints: new Set(),
 
     loan: { active:false, principal:0, monthsLeft:0, rate:0, apr:0 },
-
-    recurring: [], // from choices (e.g. phone installments)
+    recurring: [],
 
     buckets: {
       cash: 0,
@@ -463,18 +547,22 @@ function newGame(profile){
     hasRunThisMonth:false,
     redMonths:0,
 
-    stability: 55, // start
+    stability: 55,
     achievements: new Set(),
 
     questTarget: 1000,
+
+    historyBalance: [350],
+    historyEtf: [0],
   };
 }
 
 function computeFixedSum(g){
   const f = g.fixed;
+  const v = g.variable;
   return (
-    f.rent + f.utilities + f.food + f.household + f.phone + f.internet +
-    f.transport + f.clothing + f.family
+    f.rent + f.utilities + f.internet + f.phone + f.family +
+    v.food + v.fun + v.shop + v.subs + v.mobility
   );
 }
 
@@ -482,84 +570,25 @@ function computeLoanMonthly(g){
   return g.loan.active ? Math.round(g.loan.rate) : 0;
 }
 
-function recurringSum(g){
-  return g.recurring.reduce((s,r)=> s + (r.amount || 0), 0);
-}
-
-// Stability model: simple & readable
 function recomputeStability(g){
-  // Base from cash buffer & negative months
   let s = 40;
-
-  // Notgroschen helps a lot
-  s += Math.min(30, Math.floor(g.buckets.cash / 50)); // up to +30
-
-  // If balance is negative: hard penalty
+  s += Math.min(30, Math.floor(g.buckets.cash / 50));
   if(g.balance < 0) s -= 18;
-
-  // Red months penalty
   s -= g.redMonths * 6;
-
-  // Having ETF slightly helps (diversification), but too early no huge
   if(g.buckets.etf >= 200) s += 6;
   if(g.buckets.etf >= 1000) s += 8;
-
-  // Loan active adds stress
   if(g.loan.active) s -= 8;
-
-  // Recurring burdens add stress
   if(g.recurring.length > 0) s -= 5;
-
-  // Insurance: Haftpflicht on slightly improves stability
   if(g.insurance.haftpflicht) s += 3;
-
-  // Clamp and store
   g.stability = clamp(s, 0, 100);
 }
 
 function renderQuest(g){
   const pct = clamp((g.buckets.cash / g.questTarget) * 100, 0, 100);
-  el("gQuestText").textContent = `Baue Notgroschen auf: ${formatEUR(g.buckets.cash)} / ${formatEUR(g.questTarget)} (${Math.round(pct)}%)`;
+  el("gQuestText").textContent = `Notgroschen: ${formatEUR(g.buckets.cash)} / ${formatEUR(g.questTarget)} (${Math.round(pct)}%)`;
   el("gQuestFill").style.width = `${pct}%`;
 }
 
-function renderGame(){
-  const g = state.game;
-
-  recomputeStability(g);
-
-  el("hudStep").textContent = "Spiel";
-  el("gMonth").textContent = g.month;
-  el("gBalance").textContent = formatEUR(g.balance);
-  el("gIncome").textContent = formatEUR(g.income);
-  el("gCash").textContent = formatEUR(g.buckets.cash);
-  el("gEtf").textContent = formatEUR(g.buckets.etf);
-
-  el("gStabilityFill").style.width = `${g.stability}%`;
-  el("gStabilityText").textContent = `${g.stability}/100`;
-
-  el("gBalanceHint").textContent = g.balance < 0 ? "⚠ im Minus" : "✅ ok";
-
-  el("inpCash").value = g.plan.cash;
-  el("inpEtf").value = g.plan.etf;
-
-  el("btnRunMonth").disabled = g.hasRunThisMonth;
-  el("btnNextMonth").disabled = !g.hasRunThisMonth;
-
-  el("loanStatus").textContent = g.loan.active
-    ? `Aktiv: Rate ${formatEUR(g.loan.rate)}/Monat, noch ${g.loan.monthsLeft} Monate`
-    : "kein Kredit";
-
-  renderBuckets(g);
-  renderInsuranceList(g);
-  renderQuest(g);
-
-  el("goalNote").innerHTML =
-    `Ziel: <strong>Notgroschen ≥ ${formatEUR(g.questTarget)}</strong>. Rote Monate: <strong>${g.redMonths}</strong>. ` +
-    `Stabilität: <strong>${g.stability}/100</strong>.`;
-}
-
-// ------------------ Buckets ------------------
 function renderBuckets(g){
   const root = el("bucketList");
   root.innerHTML = "";
@@ -589,7 +618,7 @@ function renderBuckets(g){
       const b = g.buckets.subs.find(x => x.id === id);
       if(b) b.plan = val;
       timelineClear();
-      timelineInfo("Unterkonto-Plan geändert", "Unterkonten sind Spar-Töpfe für Ziele. Du legst einen Monatsbetrag fest.");
+      timelineInfo("Unterkonto-Plan geändert", "Unterkonten sind Spar-Töpfe. Du steuerst den Monatsbetrag.");
     });
   });
 
@@ -597,12 +626,59 @@ function renderBuckets(g){
     btn.addEventListener("click", (e) => {
       const id = e.target.getAttribute("data-del");
       g.buckets.subs = g.buckets.subs.filter(x => x.id !== id);
-      renderBuckets(g);
-      timelineClear();
-      timelineInfo("Unterkonto gelöscht", "Das ist nur ein Ziel-Topf. (Im echten Leben: getrennte Konten helfen psychologisch.)");
       renderGame();
+      timelineClear();
+      timelineInfo("Unterkonto gelöscht", "Spar-Topf entfernt.");
     });
   });
+}
+
+function renderGame(){
+  const g = state.game;
+
+  recomputeStability(g);
+
+  el("hudStep").textContent = "Spiel";
+  el("gMonth").textContent = g.month;
+  el("gBalance").textContent = formatEUR(g.balance);
+  el("gIncome").textContent = formatEUR(g.income);
+  el("gCash").textContent = formatEUR(g.buckets.cash);
+  el("gEtf").textContent = formatEUR(g.buckets.etf);
+
+  el("gStabilityFill").style.width = `${g.stability}%`;
+  el("gStabilityText").textContent = `${g.stability}/100`;
+  el("gBalanceHint").textContent = g.balance < 0 ? "⚠ im Minus" : "✅ ok";
+
+  el("inpCash").value = g.plan.cash;
+  el("inpEtf").value = g.plan.etf;
+
+  el("btnRunMonth").disabled = g.hasRunThisMonth;
+  el("btnNextMonth").disabled = !g.hasRunThisMonth;
+
+  el("loanStatus").textContent = g.loan.active
+    ? `Aktiv: Rate ${formatEUR(g.loan.rate)}/Monat, noch ${g.loan.monthsLeft} Monate`
+    : "kein Kredit";
+
+  renderBuckets(g);
+  renderInsuranceList(g);
+  renderQuest(g);
+
+  el("goalNote").innerHTML =
+    `Fixkosten+Budgets kommen aus deinem Interview. Rote Monate: <strong>${g.redMonths}</strong>. ` +
+    `Stabilität: <strong>${g.stability}/100</strong>.`;
+
+  drawLineChart("chartBalance", g.historyBalance);
+  drawLineChart("chartEtf", g.historyEtf);
+}
+
+// ---------- plan/loan/buckets ----------
+function applyPlan(){
+  const g = state.game;
+  g.plan.cash = Math.max(0, Number(el("inpCash").value || 0));
+  g.plan.etf  = Math.max(0, Number(el("inpEtf").value || 0));
+  timelineClear();
+  timelineInfo("Plan gespeichert", "Wenn zu wenig übrig ist, wird automatisch gekürzt (kein Invest aus dem Minus).");
+  renderGame();
 }
 
 function addBucket(){
@@ -617,17 +693,7 @@ function addBucket(){
   el("newBucketName").value = "";
   renderGame();
   timelineClear();
-  timelineInfo("Unterkonto angelegt", "Neuer Spar-Topf. Stell daneben einen Monatsbetrag ein.");
-}
-
-// ------------------ Plan / Loan ------------------
-function applyPlan(){
-  const g = state.game;
-  g.plan.cash = Math.max(0, Number(el("inpCash").value || 0));
-  g.plan.etf  = Math.max(0, Number(el("inpEtf").value || 0));
-  timelineClear();
-  timelineInfo("Plan gespeichert", "Wenn nach Fixkosten zu wenig übrig ist, wird der Plan automatisch gekürzt.");
-  renderGame();
+  timelineInfo("Unterkonto angelegt", "Neuer Spar-Topf.");
 }
 
 function takeLoan(){
@@ -638,130 +704,115 @@ function takeLoan(){
 
   if(amount <= 0){
     timelineClear();
-    timelineInfo("Kredit", "Trage einen Betrag > 0 ein, wenn du wirklich einen Kredit aufnehmen willst.");
+    timelineInfo("Kredit", "Trage einen Betrag > 0 ein, wenn du einen Kredit willst.");
     return;
   }
   if(g.loan.active){
     timelineClear();
-    timelineInfo("Kredit", "Du hast schon einen Kredit aktiv (Prototype: nur 1 gleichzeitig).");
+    timelineInfo("Kredit", "Du hast schon einen Kredit aktiv (Prototype: 1 gleichzeitig).");
     return;
   }
 
   const rate = calcMonthlyRate(amount, months, apr);
-  g.loan = { active:true, principal:amount, monthsLeft:months, rate:rate, apr };
+  g.loan = { active:true, principal:amount, monthsLeft:months, rate, apr };
   g.balance += amount;
 
   timelineClear();
-  timelineItem("Kredit ausgezahlt", +amount, "Sofort mehr Geld – ab jetzt monatlich Rate + Zinsen.", "#F97316");
+  timelineItem("Kredit ausgezahlt", +amount, "Sofort Geld – dafür monatliche Rate + Zinsen.", "#F97316");
   timelineItem("Monatsrate", -Math.round(rate), `Laufzeit ${months} Monate, Zins ${apr}% p.a.`, "#F97316");
   renderGame();
 
   award(g, "loan_taken", "Kredit", "Du hast einen Kredit aufgenommen. Beobachte die monatliche Belastung.");
 }
 
-// ------------------ Choice apply ------------------
-function applyChoice(g, opt){
-  // base effect
-  g.balance += opt.money;
-  g.stability = clamp(g.stability + (opt.stability || 0), 0, 100);
-
-  timelineItem("Entscheidung", opt.money, `Stabilität ${opt.stability>=0?'+':''}${opt.stability} (kurzfristig).`, "#7C3AED");
-
-  // risk handling
-  if(opt.risk){
-    const hit = Math.random() < opt.risk.p;
-    if(hit){
-      g.balance += opt.risk.hit;
-      timelineItem("Risiko trifft dich", opt.risk.hit, "Manchmal ist „billig“ am Ende teurer.", "#EF4444");
-      g.redMonths += (g.balance < 0) ? 1 : 0;
-    } else {
-      timelineInfo("Risiko ging gut", "Dieses Mal keine Strafe. (Aber Risiko bleibt Risiko.)");
-    }
-  }
-
-  // recurring add
-  if(opt.recurring){
-    g.recurring.push({
-      id: uid(),
-      label: opt.recurring.label,
-      amount: opt.recurring.amount, // negative
-      monthsLeft: opt.recurring.months,
-    });
-    timelineItem("Neue Rate", opt.recurring.amount, `Dauer: ${opt.recurring.months} Monate. Kleine Raten nerven langfristig.`, "#F97316");
-  }
+// ---------- insurance hint unlock ----------
+function unlockInsuranceHint(g, hint){
+  if(g.insuranceHints.has(hint)) return;
+  g.insuranceHints.add(hint);
+  toast("ℹ️ Versicherung-Hinweis", hint);
 }
 
-// ------------------ Month loop ------------------
+// ---------- ETF movement ----------
+function applyEtfMovement(g){
+  // monthly return: base normal + occasional shock
+  // base mean ~ +0.4% monthly, sigma ~ 4.5% (visible)
+  let r = 0.004 + randn() * 0.045;
+
+  // rare shock 10% chance: -8%..+8%
+  if(Math.random() < 0.10){
+    r += rand(-0.08, 0.08);
+  }
+
+  // clamp to avoid absurd
+  r = clamp(r, -0.20, 0.20);
+
+  const before = g.buckets.etf;
+  const change = Math.round(before * r);
+  g.buckets.etf += change;
+
+  const pct = Math.round(r*1000)/10; // 1 decimal
+  return { change, pct };
+}
+
+// ---------- month loop ----------
 function runMonth(){
   const g = state.game;
   if(g.hasRunThisMonth) return;
 
   timelineClear();
 
-  // 1) Income
+  // 1) income
   g.balance += g.income;
   timelineItem("Einkommen (Netto)", g.income, "Geld nach Steuern/Abgaben (vereinfacht).", "#22C55E");
 
-  // 2) Fix costs
+  // 2) fixed + variable budgets
   const fixedSum = computeFixedSum(g);
   g.balance -= fixedSum;
-  timelineItem("Fixkosten (Summe)", -fixedSum, "Miete, Nebenkosten, Essen, Internet, Handy, Transport …", "#111827");
 
-  // quick breakdown (but not too long – game feel)
-  const f = g.fixed;
-  timelineItem("– Miete", -f.rent, "Wohnkosten.", "#111827");
-  timelineItem("– Nebenkosten", -f.utilities, "Strom/Wasser/Heizung (vereinfacht).", "#111827");
-  timelineItem("– Essen & Trinken", -f.food, "Supermarkt/Mensa/Lebensmittel.", "#111827");
+  const f = g.fixed, v = g.variable;
+  timelineItem("Kosten (Summe)", -fixedSum, "Fixkosten + deine Lifestyle-Budgets.", "#111827");
+  timelineItem("– Miete", -f.rent, "Wohnen.", "#111827");
+  timelineItem("– Nebenkosten", -f.utilities, "Strom/Wasser/Heizung.", "#111827");
+  timelineItem("– Essen/Trinken", -v.food, "Aus dem Interview.", "#111827");
+  timelineItem("– Freizeit/Feiern", -v.fun, "Aus dem Interview.", "#111827");
+  timelineItem("– Shopping/Kleidung", -v.shop, "Aus dem Interview.", "#111827");
+  timelineItem("– Abos", -v.subs, "Streaming/Apps.", "#111827");
+  timelineItem("– Mobilität", -v.mobility, g.hasCar ? "Auto-Basiskosten." : "Ticket/Fahrrad.", "#111827");
+  timelineItem("– Internet", -f.internet, "WLAN/Vertrag.", "#111827");
+  timelineItem("– Handy", -f.phone, "Tarif.", "#111827");
+  if(f.family>0) timelineItem("– Familie", -f.family, "Mehr Personen = mehr Kosten.", "#111827");
 
-  // 3) Insurance
+  // 3) insurance
   const insSum = insuranceSum(g);
   if(insSum > 0){
     g.balance -= insSum;
-    timelineItem("Versicherungen", -insSum, "Schutz gegen große Schäden – kostet monatlich.", "#06B6D4");
+    timelineItem("Versicherungen", -insSum, "Monatliche Kosten. Schutz gegen Risiken.", "#06B6D4");
   } else {
-    timelineInfo("Versicherungen", "Keine aktiv. Spart Geld – kann später teuer werden.");
+    timelineInfo("Versicherungen", "Keine aktiv. Spart Geld – Risiko bleibt bei dir.");
   }
 
-  // 4) Loan
-  const loanPay = computeLoanMonthly(g);
+  // 4) loan
+  const loanPay = g.loan.active ? Math.round(g.loan.rate) : 0;
   if(loanPay > 0){
     g.balance -= loanPay;
     g.loan.monthsLeft -= 1;
     timelineItem("Kreditrate", -loanPay, `Noch ${g.loan.monthsLeft} Monate.`, "#F97316");
     if(g.loan.monthsLeft <= 0){
       g.loan.active = false;
-      timelineInfo("Kredit beendet", "Du hast abbezahlt. Nice.");
-      award(g, "loan_done", "Abbezahlt", "Du hast einen Kredit komplett abbezahlt.");
+      timelineInfo("Kredit beendet", "Du hast abbezahlt.");
+      award(g, "loan_done", "Abbezahlt", "Kredit komplett abbezahlt.");
     }
   }
 
-  // 5) Recurring from choices (installments)
-  if(g.recurring.length > 0){
-    let sum = 0;
-    for(const r of g.recurring){
-      if(r.monthsLeft > 0){
-        g.balance += r.amount;
-        sum += r.amount;
-        r.monthsLeft -= 1;
-      }
-    }
-    g.recurring = g.recurring.filter(r => r.monthsLeft > 0);
-    if(sum !== 0){
-      timelineItem("Raten/Abos", sum, "Kleine Beträge, die jeden Monat nerven.", "#F97316");
-    }
-  }
-
-  // 6) Quarterly costs
-  const q = quarterlyCosts(g.month);
-  for(const c of q){
+  // 5) quarterly
+  for(const c of quarterlyCosts(g.month)){
     g.balance += c.amount;
     timelineItem(c.label, c.amount, c.why, "#111827");
   }
 
-  // 7) Apply saving plan (only from positive balance)
+  // 6) apply saving plan
   const wantSub = g.buckets.subs.reduce((s,b)=> s + (b.plan||0), 0);
   const want = g.plan.cash + g.plan.etf + wantSub;
-
   const canSpend = Math.max(0, g.balance);
   const factor = want > 0 ? Math.min(1, canSpend / want) : 0;
 
@@ -771,63 +822,73 @@ function runMonth(){
   let paidSubs = 0;
   for(const b of g.buckets.subs){
     const pay = Math.floor((b.plan||0) * factor);
-    if(pay > 0){
-      b.balance += pay;
-      paidSubs += pay;
-    }
+    if(pay > 0){ b.balance += pay; paidSubs += pay; }
   }
 
   const totalPlanPaid = payCash + payEtf + paidSubs;
   if(totalPlanPaid > 0){
     g.balance -= totalPlanPaid;
-    timelineItem("Sparen/Invest", -totalPlanPaid, "Du verteilst Geld in Notgroschen, ETF und Ziele.", "#7C3AED");
+    timelineItem("Sparen/Invest", -totalPlanPaid, "Verteilung in Notgroschen/ETF/Ziele.", "#7C3AED");
   } else {
-    timelineInfo("Sparen/Invest", "Dieses Mal blieb nichts übrig. Fixkosten sind der Boss-Gegner.");
+    timelineInfo("Sparen/Invest", "Nichts übrig. Das passiert bei hohen Kosten.");
   }
 
-  if(payCash > 0){
-    g.buckets.cash += payCash;
-    timelineItem("– Notgroschen", -payCash, "Für Notfälle. Sofort verfügbar.", "#22C55E");
-  }
-  if(payEtf > 0){
-    g.buckets.etf += payEtf;
-    timelineItem("– ETF Kauf", -payEtf, "ETF schwankt monatlich.", "#06B6D4");
-  }
+  if(payCash > 0){ g.buckets.cash += payCash; timelineItem("– Notgroschen", -payCash, "Puffer für Notfälle.", "#22C55E"); }
+  if(payEtf > 0){ g.buckets.etf += payEtf; timelineItem("– ETF Kauf", -payEtf, "Du kaufst ETF-Anteile.", "#06B6D4"); }
 
-  // achievements: first savings
-  if(g.buckets.cash >= 200) award(g, "cash_200", "Rücklagen!", "Du hast erste Rücklagen aufgebaut.");
-  if(g.buckets.etf >= 200) award(g, "etf_200", "Depot gestartet", "Du hast dein erstes ETF-Depot.");
+  if(g.buckets.cash >= 200) award(g, "cash_200", "Rücklagen", "Erste Rücklagen aufgebaut.");
+  if(g.buckets.etf >= 200) award(g, "etf_200", "Depot gestartet", "Dein ETF-Depot ist live.");
 
-  // 8) Mandatory Choice (fun part)
+  // 7) choice
   const choice = CHOICES[(g.month - 1) % CHOICES.length];
-  showChoiceModal(choice, (key, opt) => {
-    applyChoice(g, opt);
+  showChoiceModal(choice, (opt) => {
+    g.balance += opt.money;
+    g.stability = clamp(g.stability + opt.stability, 0, 100);
+    timelineItem("Entscheidung", opt.money, `Stabilität ${opt.stability>=0?'+':''}${opt.stability}.`, "#7C3AED");
 
-    // 9) Event
-    const ev = drawRandomEvent();
+    // 8) event
+    const ev = drawRandomEvent(g);
     showEventModal(ev, () => {
       g.balance += ev.delta;
-      timelineItem(`Ereignis: ${ev.title}`, ev.delta, "Unerwartete Kosten/Extras passieren ständig.", "#EF4444");
+      timelineItem(`Ereignis: ${ev.title}`, ev.delta, "Unerwartete Dinge passieren.", ev.delta < 0 ? "#EF4444" : "#22C55E");
 
-      // 10) ETF monthly movement end
-      const rnd = (Math.random() * 4.0 - 1.8) / 100;
-      const change = Math.round(g.buckets.etf * rnd);
-      g.buckets.etf += change;
-      timelineItem("ETF Bewegung", change, "Kurzfristig schwankt es. Langfristig ist die Idee: wachsen.", "#06B6D4");
+      // insurance hint unlock (neutral, event-driven)
+      if(ev.key === "washer"){
+        unlockInsuranceHint(g, "Hausrat kann bei bestimmten Schäden helfen – hängt vom Fall ab.");
+      }
+      if(ev.key === "phone"){
+        unlockInsuranceHint(g, "Handyversicherung: prüfe immer Selbstbeteiligung/Ausschlüsse – lohnt nicht automatisch.");
+      }
+      if(ev.key === "bike"){
+        unlockInsuranceHint(g, "Haftpflicht hilft nicht bei Diebstahl deiner Sachen – eher bei Schäden an anderen.");
+      }
+      if(ev.key === "car_repair"){
+        unlockInsuranceHint(g, "Auto-Risiken kommen oft in Wellen. Rücklagen sind hier Gold.");
+      }
+
+      // 9) ETF movement (visible)
+      const mv = applyEtfMovement(g);
+      timelineItem(
+        "ETF Marktbewegung",
+        mv.change,
+        `Monatsrendite: ${mv.pct >= 0 ? "+" : ""}${mv.pct}% (Volatilität ist normal).`,
+        "#06B6D4"
+      );
 
       // red month
       if(g.balance < 0) g.redMonths += 1;
 
-      // stability recalculated in render
+      // update history for charts
+      g.historyBalance.push(g.balance);
+      g.historyEtf.push(g.buckets.etf);
+
       g.hasRunThisMonth = true;
 
-      // achievements: no negative months streak
-      if(g.redMonths === 0 && g.month >= 3) award(g, "no_red_3", "Stabil", "3 Monate nicht im Minus. Stark!");
-      if(g.buckets.cash >= 1000) award(g, "cash_1000", "Notgroschen!", "Ziel erreicht: 1.000 € Notgroschen.");
+      if(g.redMonths === 0 && g.month >= 3) award(g, "no_red_3", "Stabil", "3 Monate nicht im Minus.");
+      if(g.buckets.cash >= g.questTarget) award(g, "cash_1000", "Notgroschen!", "Ziel erreicht: 1.000 €.");
 
       renderGame();
 
-      // End of game after 12
       if(g.month >= 12){
         endGame();
       }
@@ -837,23 +898,13 @@ function runMonth(){
 
 function endGame(){
   const g = state.game;
-
-  timelineInfo("Abschluss", "12 Monate sind rum. Hier ist dein Ergebnis:");
+  timelineInfo("Abschluss", "12 Monate sind rum. Ergebnis:");
   const wealth = g.balance + g.buckets.cash + g.buckets.etf + g.buckets.subs.reduce((s,b)=>s+b.balance,0);
-  timelineItem("Gesamtvermögen", wealth, "Kontostand + Notgroschen + ETF + Ziele (vereinfacht).", "#22C55E");
-  timelineItem("Rote Monate", -g.redMonths, g.redMonths === 0 ? "✅ kein Monat im Minus" : "⚠ mindestens einmal im Minus", "#111827");
-
-  const okCash = g.buckets.cash >= g.questTarget;
-  if(okCash){
-    timelineInfo("Fazit", "Stabil! Notgroschen-Ziel erreicht. Du hast dir Puffer gebaut.");
-  } else {
-    timelineInfo("Fazit", "Du bist noch nicht stabil genug. Hebel: Fixkosten senken oder Plan kleiner starten (erst Notgroschen).");
-  }
-
+  timelineItem("Gesamtvermögen", wealth, "Kontostand + Notgroschen + ETF + Ziele.", "#22C55E");
+  timelineItem("Rote Monate", -g.redMonths, g.redMonths === 0 ? "✅ kein Minus" : "⚠ mindestens einmal Minus", "#111827");
+  toast("🎉 Ende", "Als nächstes könnten wir PDF-Export bauen – wenn du willst.");
   el("btnRunMonth").disabled = true;
   el("btnNextMonth").disabled = true;
-
-  toast("🎉 Ende", "Wenn du willst: als nächstes bauen wir PDF-Export + Scam-Events (Phishing).");
 }
 
 function nextMonth(){
@@ -865,11 +916,11 @@ function nextMonth(){
   g.hasRunThisMonth = false;
 
   timelineClear();
-  timelineInfo("Neuer Monat", "Bereit? Klick auf „Monat starten“.");
+  timelineInfo("Neuer Monat", "Bereit? Monat starten.");
   renderGame();
 }
 
-// ------------------ Screens ------------------
+// ---------- screens ----------
 function showScreen(which){
   const a = el("screenInterview");
   const b = el("screenGame");
@@ -884,23 +935,36 @@ function showScreen(which){
   }
 }
 
-// ------------------ Interview refresh ------------------
+// ---------- interview refresh ----------
+let typingController = null;
+async function typeText(node, text){
+  if (typingController) typingController.abort();
+  typingController = new AbortController();
+  const signal = typingController.signal;
+  node.textContent = "";
+  for(let i=0;i<text.length;i++){
+    if(signal.aborted) return;
+    node.textContent += text[i];
+    await new Promise(r => setTimeout(r, 8));
+  }
+}
+
 function refreshInterview(){
   state.profile = getProfile();
   drawAvatar(state.profile, state.salt);
   typeText(el("storyText"), buildStory(state.profile));
 }
 
-// ------------------ Init ------------------
+// ---------- init ----------
 function init(){
-  // Glossary
+  // glossary
   el("btnGlossaryTop").addEventListener("click", openGlossary);
   el("btnCloseGlossary").addEventListener("click", closeGlossary);
   el("glossaryDrawer").addEventListener("click", (e) => {
     if(e.target.id === "glossaryDrawer") closeGlossary();
   });
 
-  // Reset top
+  // reset top
   el("btnResetTop").addEventListener("click", () => {
     state.game = null;
     showScreen("interview");
@@ -909,13 +973,18 @@ function init(){
     el("living").value = "miete";
     el("family").value = "single";
     el("style").value = "neutral";
+    el("lifeFood").value = "normal";
+    el("lifeFun").value = "mid";
+    el("lifeShop").value = "mid";
+    el("lifeSubs").value = "few";
+    el("lifeMobility").value = "ticket";
     state.salt = 0;
     refreshInterview();
     toast("Reset", "Zurück zum Interview.");
   });
 
-  // Interview changes
-  ["path","field","living","family","style"].forEach(id => {
+  // interview changes
+  ["path","field","living","family","style","lifeFood","lifeFun","lifeShop","lifeSubs","lifeMobility"].forEach(id => {
     el(id).addEventListener("change", refreshInterview);
   });
 
@@ -931,6 +1000,11 @@ function init(){
     el("living").value = "miete";
     el("family").value = "single";
     el("style").value = "neutral";
+    el("lifeFood").value = "normal";
+    el("lifeFun").value = "mid";
+    el("lifeShop").value = "mid";
+    el("lifeSubs").value = "few";
+    el("lifeMobility").value = "ticket";
     refreshInterview();
   });
 
@@ -939,15 +1013,14 @@ function init(){
     state.game = newGame(state.profile);
     showScreen("game");
     timelineClear();
-    timelineInfo("Start", "Monat 1: Fixkosten sind sofort sichtbar. Danach kommt deine Entscheidungskarte.");
+    timelineInfo("Start", "Deine Lifestyle-Angaben erzeugen deine Monatsbudgets. Jetzt wird’s real.");
     renderGame();
   });
 
-  // Game actions
+  // game actions
   el("btnApplyPlan").addEventListener("click", applyPlan);
   el("btnAddBucket").addEventListener("click", addBucket);
   el("btnTakeLoan").addEventListener("click", takeLoan);
-
   el("btnRunMonth").addEventListener("click", runMonth);
   el("btnNextMonth").addEventListener("click", nextMonth);
 
