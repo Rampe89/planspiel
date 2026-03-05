@@ -3,18 +3,18 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#f6f7fb" />
   <title>MoneyQuest – Planspiel</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <main class="app">
-
-    <!-- Top HUD -->
     <header class="hud">
       <div class="hudLeft">
         <div class="logo">
           <span class="logoDot" aria-hidden="true"></span>
           <span class="logoText">MoneyQuest</span>
+          <span class="logoSub" aria-hidden="true">BETA</span>
         </div>
         <div class="hudChip" id="hudStep">Interview</div>
       </div>
@@ -25,29 +25,15 @@
       </div>
     </header>
 
-    <!-- Achievements Overlay -->
-    <div class="achOverlay" id="achOverlay" aria-live="polite">
-      <div class="achBar">
-        <div class="achLeft">
-          <span class="achIcon" aria-hidden="true">🏆</span>
-          <span class="achTitle">Achievements</span>
-          <span class="achCount" id="achCount">0</span>
-        </div>
-        <div class="achRight" id="achMiniRow"></div>
-      </div>
-      <div class="achToast hidden" id="achToast">
-        <div class="achToastTitle" id="achToastTitle">Achievement</div>
-        <div class="achToastText" id="achToastText">—</div>
-      </div>
-    </div>
-
     <!-- SCREEN: INTERVIEW -->
     <section class="screen" id="screenInterview">
       <div class="layout">
         <div class="panel side">
           <div class="sideCard">
             <div class="avatarFrame">
-              <canvas id="avatar" width="16" height="16" aria-label="Pixel Avatar"></canvas>
+              <div class="avatarWrap" data-scale="12">
+                <canvas id="avatar" width="16" height="16" aria-label="Pixel Avatar"></canvas>
+              </div>
             </div>
 
             <div class="sideButtons">
@@ -55,14 +41,20 @@
               <button id="reset" class="btn soft ghost" type="button">Profil Reset</button>
             </div>
 
-            <div class="bubble">
-              <div class="bubbleTitle">Dein Start</div>
-              <div class="bubbleText" id="storyText"></div>
+            <div class="noteCard">
+              <div class="noteHead">
+                <div class="noteTitle">Dein Start</div>
+                <div class="noteTag">Story</div>
+              </div>
+              <div class="noteBody" id="storyText"></div>
             </div>
 
-            <div class="bubble miniBubble">
-              <div class="bubbleTitle">Kurz erklärt</div>
-              <div class="bubbleText">
+            <div class="noteCard noteMuted">
+              <div class="noteHead">
+                <div class="noteTitle">Kurz erklärt</div>
+                <div class="noteTag">How to</div>
+              </div>
+              <div class="noteBody">
                 Du baust dir ein Profil. Daraus entstehen Fixkosten und Budgets.
                 Dann spielst du 12 Monate: Entscheidungen, Ereignisse, Zielkonflikte.
                 Wichtig: Nicht nur Geld – auch Komfort & Soziales zählen.
@@ -197,128 +189,140 @@
       </div>
     </section>
 
-    <!-- SCREEN: GAME (Card Mode) -->
+    <!-- SCREEN: GAME -->
     <section class="screen hidden" id="screenGame">
-
-      <!-- Compact Stats Row -->
-      <div class="gameHud compactHud">
-        <div class="statCard">
-          <div class="statLabel">Monat</div>
+      <div class="gameHud">
+        <div class="statCard isMonth">
+          <div class="statLabel"><span class="ico" aria-hidden="true">🗓️</span> Monat</div>
           <div class="statValue"><span id="gMonth">1</span><span class="muted">/12</span></div>
         </div>
 
-        <div class="statCard">
-          <div class="statLabel">Kontostand</div>
+        <div class="statCard isMoney">
+          <div class="statLabel"><span class="ico" aria-hidden="true">💶</span> Kontostand</div>
           <div class="statValue" id="gBalance">0 €</div>
           <div class="statTiny" id="gBalanceHint"></div>
         </div>
 
-        <div class="statCard">
-          <div class="statLabel">Notgroschen</div>
-          <div class="statValue clickableKpi" id="gCash">0 €</div>
-          <div class="statTiny">klicken: entnehmen</div>
+        <div class="statCard isIncome">
+          <div class="statLabel"><span class="ico" aria-hidden="true">📥</span> Netto</div>
+          <div class="statValue" id="gIncome">0 €</div>
+          <div class="statTiny">Einkommen/Monat</div>
         </div>
 
-        <div class="statCard">
-          <div class="statLabel">ETF</div>
-          <div class="statValue clickableKpi" id="gEtf">0 €</div>
-          <div class="statTiny">klicken: verkaufen</div>
-        </div>
-
-        <div class="statCard grow">
+        <div class="statCard grow isStability">
           <div class="statLabelRow">
-            <span class="statLabel">Stabilität</span>
+            <span class="statLabel"><span class="ico" aria-hidden="true">🛡️</span> Stabilität</span>
             <span class="statTiny" id="gStabilityText">—</span>
           </div>
           <div class="meter">
             <div class="meterFill" id="gStabilityFill"></div>
           </div>
+          <div class="statTiny">Rücklagen/Schulden/Minus-Monate</div>
         </div>
 
-        <div class="statCard grow">
+        <div class="statCard grow isComfort">
           <div class="statLabelRow">
-            <span class="statLabel">Komfort</span>
+            <span class="statLabel"><span class="ico" aria-hidden="true">🛋️</span> Komfort</span>
             <span class="statTiny" id="gComfortText">—</span>
           </div>
           <div class="meter">
             <div class="meterFill" id="gComfortFill"></div>
           </div>
+          <div class="statTiny">Mobilität/Einrichtung/Bequemlichkeit</div>
         </div>
 
-        <div class="statCard grow">
+        <div class="statCard grow isSocial">
           <div class="statLabelRow">
-            <span class="statLabel">Soziales</span>
+            <span class="statLabel"><span class="ico" aria-hidden="true">🤝</span> Soziales</span>
             <span class="statTiny" id="gSocialText">—</span>
           </div>
           <div class="meter">
             <div class="meterFill" id="gSocialFill"></div>
           </div>
+          <div class="statTiny">Kino/Freunde/Isolation</div>
         </div>
       </div>
 
-      <div class="layout gameLayoutCard">
-
-        <!-- Main Card Area -->
-        <div class="panel main cardStage">
-          <div class="cardTopRow">
-            <div class="cardModeTitle">Karten-Modus</div>
-            <div class="cardModeActions">
-              <button class="btn soft" id="btnShop" type="button">🛒 Shop</button>
-              <button class="btn soft ghost" id="btnToggleLog" type="button">📜 Log</button>
-            </div>
-          </div>
-
-          <div class="cardDeck">
-            <div class="bigCard" id="card">
-              <div class="bigCardHead">
-                <div class="bigCardBadge" id="cardBadge">Start</div>
-                <div class="bigCardTitle" id="cardTitle">—</div>
-              </div>
-
-              <div class="bigCardBody">
-                <div class="bigCardText" id="cardText">—</div>
-
-                <div class="impactRow" id="cardImpacts"></div>
-
-                <div class="bigCardChoices" id="cardChoices"></div>
-
-                <div class="bigCardFooter" id="cardFooter">—</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Collapsible Log -->
-          <div class="logWrap hidden" id="logWrap">
-            <div class="logHead">
-              <strong>Monats-Log</strong>
-              <span class="muted" id="logHint">kurz & knapp</span>
-            </div>
-            <div class="timeline" id="gLog"></div>
+      <div class="questRow">
+        <div class="questCard isQuest">
+          <div class="questTitle"><span class="ico" aria-hidden="true">🎯</span> Quest</div>
+          <div class="questText" id="gQuestText">—</div>
+          <div class="questBar">
+            <div class="questFill" id="gQuestFill"></div>
           </div>
         </div>
 
-        <!-- Right Side Panel -->
+        <div class="kpis">
+          <div class="kpi isCash">
+            <div class="kpiLabel"><span class="ico" aria-hidden="true">🧰</span> Notgroschen</div>
+            <div class="kpiValue" id="gCash">0 €</div>
+          </div>
+          <div class="kpi isEtf">
+            <div class="kpiLabel"><span class="ico" aria-hidden="true">📈</span> ETF-Depot</div>
+            <div class="kpiValue" id="gEtf">0 €</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="layout gameLayout">
+        <div class="panel main">
+          <div class="panelHead">
+            <h2>Monats-Timeline</h2>
+            <div class="panelButtons">
+              <button class="btn soft" id="btnRunMonth" type="button">Monat starten</button>
+              <button class="btn soft ghost" id="btnNextMonth" type="button" disabled>Nächster Monat</button>
+            </div>
+          </div>
+
+          <div class="tinyHelp" id="gExplain">
+            Ablauf: Einkommen → Kosten → Plan → Entscheidung → Zielkonflikt/Events → ETF schwankt.
+          </div>
+
+          <div class="timeline" id="gLog"></div>
+
+          <div class="charts">
+            <div class="chartCard">
+              <div class="chartHead">
+                <strong>Kontostand</strong>
+                <span class="chartTiny">12 Monate</span>
+              </div>
+              <canvas id="chartBalance" width="600" height="160"></canvas>
+            </div>
+
+            <div class="chartCard">
+              <div class="chartHead">
+                <strong>ETF</strong>
+                <span class="chartTiny">schwankt</span>
+              </div>
+              <canvas id="chartEtf" width="600" height="160"></canvas>
+            </div>
+          </div>
+        </div>
+
         <div class="panel side">
           <div class="stack">
-
             <div class="cardBox">
               <div class="boxHead">
-                <h3>Plan</h3>
+                <h3>Sparplan</h3>
                 <span class="chip">monatlich</span>
               </div>
-              <p class="small">Plan gilt in Phase “Sparen”. Im Minus wird nicht investiert.</p>
+              <p class="small">Plan wird nach Fixkosten angewendet. Im Minus wird nicht investiert.</p>
 
               <div class="field">
                 <label>Notgroschen (€/Monat)</label>
                 <input id="inpCash" type="number" min="0" step="10" value="100" />
+                <div class="hintLine">Sofort verfügbar für Notfälle.</div>
               </div>
 
               <div class="field">
                 <label>ETF (€/Monat)</label>
                 <input id="inpEtf" type="number" min="0" step="10" value="100" />
+                <div class="hintLine">Risiko/Chance. Kein Invest aus dem Minus.</div>
               </div>
 
               <div class="subhead">Unterkonten</div>
+              <p class="small">Spar-Töpfe für Ziele.</p>
+
               <div id="bucketList" class="bucketList"></div>
 
               <div class="bucketAdd">
@@ -331,20 +335,10 @@
 
             <div class="cardBox">
               <div class="boxHead">
-                <h3>Inventar</h3>
-                <span class="chip">Assets</span>
-              </div>
-              <p class="small">Einmal gekauft = bleibt. Manche Assets geben kleine Vorteile.</p>
-              <div class="invGrid" id="invGrid"></div>
-              <div class="small muted" id="invHint"></div>
-            </div>
-
-            <div class="cardBox">
-              <div class="boxHead">
                 <h3>Versicherungen</h3>
                 <span class="chip">Info durch Events</span>
               </div>
-              <p class="small">Hinweise schalten sich im Spiel frei.</p>
+              <p class="small">Keine Spoiler-Bewertung. Hinweise schalten sich im Spiel frei.</p>
               <div id="insuranceList" class="insuranceList"></div>
               <div class="small" id="insuranceUnlockedHint"></div>
             </div>
@@ -354,7 +348,7 @@
                 <h3>Kredit</h3>
                 <span class="chip warn">Zins fest</span>
               </div>
-              <p class="small">Kredit = sofort Geld, aber Rate + Zinsen.</p>
+              <p class="small">Kredit = sofort Geld, aber Rate + Zinsen. Zinsen sind vorgegeben.</p>
 
               <div class="field">
                 <label>Kredittyp</label>
@@ -377,7 +371,6 @@
               <button class="btn soft ghost" id="btnTakeLoan" type="button">Kredit aufnehmen</button>
               <div class="small" id="loanStatus">kein Kredit</div>
             </div>
-
           </div>
         </div>
       </div>
@@ -385,33 +378,37 @@
       <div class="footerNote" id="goalNote"></div>
     </section>
 
-    <!-- SCREEN: SHOP -->
-    <section class="screen hidden" id="screenShop">
-      <div class="panel shopPanel">
-        <div class="shopHead">
-          <div>
-            <h2 class="shopTitle">🛒 Shop</h2>
-            <p class="sub">Kaufe Assets, die deinen Alltag verändern. Einmal gekauft = bleibt.</p>
-          </div>
-          <div class="shopActions">
-            <button class="btn soft" id="btnShopBack" type="button">← Zurück</button>
-          </div>
-        </div>
-
-        <div class="shopMetaRow">
-          <div class="shopMeta">
-            <span class="muted">Kontostand:</span>
-            <strong id="shopBalance">0 €</strong>
-          </div>
-          <div class="shopMeta">
-            <span class="muted">Hinweis:</span>
-            <span>Assets können Komfort/Soziales/Stabilität beeinflussen.</span>
-          </div>
-        </div>
-
-        <div class="shopGrid" id="shopGrid"></div>
+    <!-- MODAL: CHOICE -->
+    <div class="modal hidden" id="choiceModal" role="dialog" aria-modal="true">
+      <div class="modalCard">
+        <div class="modalTitle" id="choiceTitle">Entscheidung</div>
+        <div class="modalText" id="choiceText"></div>
+        <div class="choiceGrid" id="choiceActions"></div>
+        <div class="modalTiny">Hinweis: Stabilität, Komfort und Soziales verändern sich messbar.</div>
       </div>
-    </section>
+    </div>
+
+    <!-- MODAL: EVENT -->
+    <div class="modal hidden" id="eventModal" role="dialog" aria-modal="true">
+      <div class="modalCard">
+        <div class="modalTitle" id="eventTitle">Ereignis</div>
+        <div class="modalText" id="eventText"></div>
+        <div class="modalActions">
+          <button class="btn primary" id="eventOk" type="button">OK</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: END -->
+    <div class="modal hidden" id="endModal" role="dialog" aria-modal="true">
+      <div class="modalCard">
+        <div class="modalTitle" id="endTitle">Auswertung</div>
+        <div class="modalText" id="endBody"></div>
+        <div class="modalActions">
+          <button class="btn primary" id="endOk" type="button">Schließen</button>
+        </div>
+      </div>
+    </div>
 
     <!-- DRAWER: GLOSSARY -->
     <div class="drawer hidden" id="glossaryDrawer" aria-hidden="true">
@@ -429,7 +426,6 @@
       <div class="toastTitle" id="toastTitle">Info</div>
       <div class="toastText" id="toastText"></div>
     </div>
-
   </main>
 
   <script src="game.js"></script>
