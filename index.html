@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#f6f7fb" />
   <title>MoneyQuest – Planspiel</title>
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -13,6 +14,7 @@
         <div class="logo">
           <span class="logoDot" aria-hidden="true"></span>
           <span class="logoText">MoneyQuest</span>
+          <span class="logoSub" aria-hidden="true">BETA</span>
         </div>
         <div class="hudChip" id="hudStep">Interview</div>
       </div>
@@ -29,7 +31,9 @@
         <div class="panel side">
           <div class="sideCard">
             <div class="avatarFrame">
-              <canvas id="avatar" width="16" height="16" aria-label="Pixel Avatar"></canvas>
+              <div class="avatarWrap" data-scale="12">
+                <canvas id="avatar" width="16" height="16" aria-label="Pixel Avatar"></canvas>
+              </div>
             </div>
 
             <div class="sideButtons">
@@ -37,14 +41,20 @@
               <button id="reset" class="btn soft ghost" type="button">Profil Reset</button>
             </div>
 
-            <div class="bubble">
-              <div class="bubbleTitle">Dein Start</div>
-              <div class="bubbleText" id="storyText"></div>
+            <div class="noteCard">
+              <div class="noteHead">
+                <div class="noteTitle">Dein Start</div>
+                <div class="noteTag">Story</div>
+              </div>
+              <div class="noteBody" id="storyText"></div>
             </div>
 
-            <div class="bubble miniBubble">
-              <div class="bubbleTitle">Kurz erklärt</div>
-              <div class="bubbleText">
+            <div class="noteCard noteMuted">
+              <div class="noteHead">
+                <div class="noteTitle">Kurz erklärt</div>
+                <div class="noteTag">How to</div>
+              </div>
+              <div class="noteBody">
                 Du baust dir ein Profil. Daraus entstehen Fixkosten und Budgets.
                 Dann spielst du 12 Monate: Entscheidungen, Ereignisse, Zielkonflikte.
                 Wichtig: Nicht nur Geld – auch Komfort & Soziales zählen.
@@ -182,26 +192,26 @@
     <!-- SCREEN: GAME -->
     <section class="screen hidden" id="screenGame">
       <div class="gameHud">
-        <div class="statCard">
-          <div class="statLabel">Monat</div>
+        <div class="statCard isMonth">
+          <div class="statLabel"><span class="ico" aria-hidden="true">🗓️</span> Monat</div>
           <div class="statValue"><span id="gMonth">1</span><span class="muted">/12</span></div>
         </div>
 
-        <div class="statCard">
-          <div class="statLabel">Kontostand</div>
+        <div class="statCard isMoney">
+          <div class="statLabel"><span class="ico" aria-hidden="true">💶</span> Kontostand</div>
           <div class="statValue" id="gBalance">0 €</div>
           <div class="statTiny" id="gBalanceHint"></div>
         </div>
 
-        <div class="statCard">
-          <div class="statLabel">Netto</div>
+        <div class="statCard isIncome">
+          <div class="statLabel"><span class="ico" aria-hidden="true">📥</span> Netto</div>
           <div class="statValue" id="gIncome">0 €</div>
           <div class="statTiny">Einkommen/Monat</div>
         </div>
 
-        <div class="statCard grow">
+        <div class="statCard grow isStability">
           <div class="statLabelRow">
-            <span class="statLabel">Stabilität</span>
+            <span class="statLabel"><span class="ico" aria-hidden="true">🛡️</span> Stabilität</span>
             <span class="statTiny" id="gStabilityText">—</span>
           </div>
           <div class="meter">
@@ -210,9 +220,9 @@
           <div class="statTiny">Rücklagen/Schulden/Minus-Monate</div>
         </div>
 
-        <div class="statCard grow">
+        <div class="statCard grow isComfort">
           <div class="statLabelRow">
-            <span class="statLabel">Komfort</span>
+            <span class="statLabel"><span class="ico" aria-hidden="true">🛋️</span> Komfort</span>
             <span class="statTiny" id="gComfortText">—</span>
           </div>
           <div class="meter">
@@ -221,9 +231,9 @@
           <div class="statTiny">Mobilität/Einrichtung/Bequemlichkeit</div>
         </div>
 
-        <div class="statCard grow">
+        <div class="statCard grow isSocial">
           <div class="statLabelRow">
-            <span class="statLabel">Soziales</span>
+            <span class="statLabel"><span class="ico" aria-hidden="true">🤝</span> Soziales</span>
             <span class="statTiny" id="gSocialText">—</span>
           </div>
           <div class="meter">
@@ -234,8 +244,8 @@
       </div>
 
       <div class="questRow">
-        <div class="questCard">
-          <div class="questTitle">Quest</div>
+        <div class="questCard isQuest">
+          <div class="questTitle"><span class="ico" aria-hidden="true">🎯</span> Quest</div>
           <div class="questText" id="gQuestText">—</div>
           <div class="questBar">
             <div class="questFill" id="gQuestFill"></div>
@@ -243,12 +253,12 @@
         </div>
 
         <div class="kpis">
-          <div class="kpi">
-            <div class="kpiLabel">Notgroschen</div>
+          <div class="kpi isCash">
+            <div class="kpiLabel"><span class="ico" aria-hidden="true">🧰</span> Notgroschen</div>
             <div class="kpiValue" id="gCash">0 €</div>
           </div>
-          <div class="kpi">
-            <div class="kpiLabel">ETF-Depot</div>
+          <div class="kpi isEtf">
+            <div class="kpiLabel"><span class="ico" aria-hidden="true">📈</span> ETF-Depot</div>
             <div class="kpiValue" id="gEtf">0 €</div>
           </div>
         </div>
