@@ -599,7 +599,8 @@ function renderBuckets(g){
         <input type="number" min="0" step="10" value="${b.plan}" data-bucket="${b.id}" />
       </div>
       <div class="bucketActions">
-        <button class="btn soft ghost" data-del="${b.id}" type="button">✕</button>
+        <button class="btn soft" data-withdraw="${b.id}" type="button" title="Geld aus dem Topf ins Konto zurückholen">↩</button>
+        <button class="btn soft ghost" data-del="${b.id}" type="button" title="Topf löschen">✕</button>
       </div>
     `;
     root.appendChild(row);
@@ -623,6 +624,40 @@ function renderBuckets(g){
       renderGame();
       timelineClear();
       timelineInfo("Unterkonto gelöscht", "Spar-Topf entfernt.");
+    });
+  });
+
+  root.querySelectorAll('button[data-withdraw]').forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      const id = e.target.getAttribute("data-withdraw");
+      const b = g.buckets.subs.find(x => x.id === id);
+      if(!b) return;
+      if(b.balance <= 0){
+        toast("Entnahme", "In diesem Topf ist gerade nichts drin.");
+        return;
+      }
+
+      // Simple UX for now: prompt.
+      const raw = prompt(`Wie viel € willst du aus "${b.name}" entnehmen? (max. ${Math.round(b.balance)} €)`, "50");
+      if(raw === null) return;
+
+      const amount = Math.floor(Number(raw));
+      if(!Number.isFinite(amount) || amount <= 0){
+        toast("Entnahme", "Bitte eine Zahl > 0 eingeben.");
+        return;
+      }
+      if(amount > b.balance){
+        toast("Entnahme", "Geht nicht: Betrag ist höher als der Stand im Topf.");
+        return;
+      }
+
+      b.balance -= amount;
+      g.balance += amount;
+
+      // Log + render
+      timelineClear();
+      timelineItem(`Entnahme: ${b.name}`, +amount, `Du holst Geld aus dem Topf zurück aufs Konto. Neuer Stand: ${formatEUR(b.balance)}.`, "#7C3AED");
+      renderGame();
     });
   });
 }
