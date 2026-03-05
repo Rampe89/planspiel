@@ -11,15 +11,15 @@
     <header class="hud">
       <div class="hudLeft">
         <div class="logo">
-          <span class="logoDot"></span>
+          <span class="logoDot" aria-hidden="true"></span>
           <span class="logoText">MoneyQuest</span>
         </div>
         <div class="hudChip" id="hudStep">Interview</div>
       </div>
 
       <div class="hudRight">
-        <button class="hudBtn" id="btnGlossaryTop" type="button">ℹ️ Begriffe</button>
-        <button class="hudBtn ghost" id="btnResetTop" type="button">↺ Reset</button>
+        <button class="hudBtn" id="btnGlossaryTop" type="button">Begriffe</button>
+        <button class="hudBtn ghost" id="btnResetTop" type="button">Reset</button>
       </div>
     </header>
 
@@ -33,20 +33,21 @@
             </div>
 
             <div class="sideButtons">
-              <button id="regen" class="btn soft" type="button">🎲 Avatar neu</button>
-              <button id="reset" class="btn soft ghost" type="button">↺ Profil Reset</button>
+              <button id="regen" class="btn soft" type="button">Avatar neu</button>
+              <button id="reset" class="btn soft ghost" type="button">Profil Reset</button>
             </div>
 
             <div class="bubble">
-              <div class="bubbleTitle">Story</div>
+              <div class="bubbleTitle">Dein Start</div>
               <div class="bubbleText" id="storyText"></div>
             </div>
 
             <div class="bubble miniBubble">
-              <div class="bubbleTitle">Wie funktioniert’s?</div>
+              <div class="bubbleTitle">Kurz erklärt</div>
               <div class="bubbleText">
-                Du wählst Profil + Lifestyle. Daraus entstehen Fixkosten + Budgets.
-                Dann spielst du 12 Monate mit Entscheidungen, Ereignissen, Komfort- und Sozial-Tradeoffs.
+                Du baust dir ein Profil. Daraus entstehen Fixkosten und Budgets.
+                Dann spielst du 12 Monate: Entscheidungen, Ereignisse, Zielkonflikte.
+                Wichtig: Nicht nur Geld – auch Komfort & Soziales zählen.
               </div>
             </div>
           </div>
@@ -55,10 +56,10 @@
         <div class="panel main">
           <div class="titleBlock">
             <h1>Profil & Lifestyle</h1>
-            <p class="sub">Je genauer du hier bist, desto realistischer werden deine Monatskosten.</p>
+            <p class="sub">Je genauer du hier bist, desto realistischer werden die Monatskosten.</p>
           </div>
 
-          <div class="sectionTitle">1) Profil</div>
+          <div class="sectionTitle">Profil</div>
           <div class="formGrid">
             <div class="field">
               <label>Lebensweg</label>
@@ -109,9 +110,9 @@
             </div>
           </div>
 
-          <div class="sectionTitle">2) Lifestyle (Konsum)</div>
+          <div class="sectionTitle">Lifestyle</div>
           <p class="small">
-            Das sind variable Kosten. Komfort & Soziales reagieren darauf (nicht nur dein Kontostand).
+            Variable Kosten. Komfort & Soziales reagieren darauf (nicht nur dein Kontostand).
           </p>
 
           <div class="formGrid">
@@ -125,7 +126,7 @@
             </div>
 
             <div class="field">
-              <label>Feiern/Freizeit</label>
+              <label>Freizeit / Feiern</label>
               <select id="lifeFun">
                 <option value="low">low</option>
                 <option value="mid" selected>mid</option>
@@ -134,7 +135,7 @@
             </div>
 
             <div class="field">
-              <label>Kleidung/Shopping</label>
+              <label>Kleidung / Shopping</label>
               <select id="lifeShop">
                 <option value="low">low</option>
                 <option value="mid" selected>mid</option>
@@ -143,7 +144,7 @@
             </div>
 
             <div class="field">
-              <label>Abos/Streaming</label>
+              <label>Abos / Streaming</label>
               <select id="lifeSubs">
                 <option value="none">keine</option>
                 <option value="few" selected>wenige</option>
@@ -154,7 +155,7 @@
             <div class="field">
               <label>Mobilität</label>
               <select id="lifeMobility">
-                <option value="ticket" selected>ÖPNV/Deutschlandticket</option>
+                <option value="ticket" selected>ÖPNV / Ticket</option>
                 <option value="bike">Fahrrad</option>
                 <option value="car">Auto</option>
               </select>
@@ -165,15 +166,14 @@
             <div class="ctaLeft">
               <div class="ctaTitle">Ziel (12 Monate)</div>
               <div class="ctaText">
-                <strong>Notgroschen ≥ 1.000 €</strong> & möglichst <strong>wenige rote Monate</strong>.
-                Nebenbei: Komfort & Soziales nicht komplett crashen 😉
+                <strong>Notgroschen ≥ 1.000 €</strong> und möglichst wenige Minus-Monate.
               </div>
             </div>
-            <button id="start" class="btn primary" type="button">Starten →</button>
+            <button id="start" class="btn primary" type="button">Starten</button>
           </div>
 
           <div class="microRow">
-            <span class="microPill">💡 Tipp: Im Spiel sind nicht nur Geld-Entscheidungen wichtig, sondern auch Komfort & Social.</span>
+            <span class="microPill">Tipp: Wenn du alles streichst, sinkt Soziales. Wenn du alles kaufst, sinkt Stabilität.</span>
           </div>
         </div>
       </div>
@@ -255,18 +255,17 @@
       </div>
 
       <div class="layout gameLayout">
-        <!-- LEFT -->
         <div class="panel main">
           <div class="panelHead">
             <h2>Monats-Timeline</h2>
             <div class="panelButtons">
               <button class="btn soft" id="btnRunMonth" type="button">Monat starten</button>
-              <button class="btn soft ghost" id="btnNextMonth" type="button" disabled>Nächster Monat →</button>
+              <button class="btn soft ghost" id="btnNextMonth" type="button" disabled>Nächster Monat</button>
             </div>
           </div>
 
           <div class="tinyHelp" id="gExplain">
-            Jeden Monat: Fixkosten/Budgets → Entscheidung → Ereignis → ETF schwankt. Komfort & Soziales reagieren.
+            Ablauf: Einkommen → Kosten → Plan → Entscheidung → Zielkonflikt/Events → ETF schwankt.
           </div>
 
           <div class="timeline" id="gLog"></div>
@@ -274,7 +273,7 @@
           <div class="charts">
             <div class="chartCard">
               <div class="chartHead">
-                <strong>Kontostand-Verlauf</strong>
+                <strong>Kontostand</strong>
                 <span class="chartTiny">12 Monate</span>
               </div>
               <canvas id="chartBalance" width="600" height="160"></canvas>
@@ -282,15 +281,14 @@
 
             <div class="chartCard">
               <div class="chartHead">
-                <strong>ETF-Verlauf</strong>
-                <span class="chartTiny">Volatil</span>
+                <strong>ETF</strong>
+                <span class="chartTiny">schwankt</span>
               </div>
               <canvas id="chartEtf" width="600" height="160"></canvas>
             </div>
           </div>
         </div>
 
-        <!-- RIGHT -->
         <div class="panel side">
           <div class="stack">
             <div class="cardBox">
@@ -298,9 +296,7 @@
                 <h3>Sparplan</h3>
                 <span class="chip">monatlich</span>
               </div>
-              <p class="small">
-                Plan wird nach Fixkosten angewendet. Im Minus wird nicht investiert.
-              </p>
+              <p class="small">Plan wird nach Fixkosten angewendet. Im Minus wird nicht investiert.</p>
 
               <div class="field">
                 <label>Notgroschen (€/Monat)</label>
@@ -311,7 +307,7 @@
               <div class="field">
                 <label>ETF (€/Monat)</label>
                 <input id="inpEtf" type="number" min="0" step="10" value="100" />
-                <div class="hintLine">ETF schwankt (Risiko/Chance). Nicht aus dem Minus.</div>
+                <div class="hintLine">Risiko/Chance. Kein Invest aus dem Minus.</div>
               </div>
 
               <div class="subhead">Unterkonten</div>
@@ -330,11 +326,9 @@
             <div class="cardBox">
               <div class="boxHead">
                 <h3>Versicherungen</h3>
-                <span class="chip">ohne Spoiler</span>
+                <span class="chip">Info durch Events</span>
               </div>
-              <p class="small">
-                Keine „richtige“ Antwort. Infos schalten sich durch Ereignisse frei.
-              </p>
+              <p class="small">Keine Spoiler-Bewertung. Hinweise schalten sich im Spiel frei.</p>
               <div id="insuranceList" class="insuranceList"></div>
               <div class="small" id="insuranceUnlockedHint"></div>
             </div>
@@ -344,9 +338,7 @@
                 <h3>Kredit</h3>
                 <span class="chip warn">Zins fest</span>
               </div>
-              <p class="small">
-                Kredit = sofort Geld, aber Rate + Zinsen. Zinsen sind vorgegeben (realistisch).
-              </p>
+              <p class="small">Kredit = sofort Geld, aber Rate + Zinsen. Zinsen sind vorgegeben.</p>
 
               <div class="field">
                 <label>Kredittyp</label>
@@ -382,7 +374,7 @@
         <div class="modalTitle" id="choiceTitle">Entscheidung</div>
         <div class="modalText" id="choiceText"></div>
         <div class="choiceGrid" id="choiceActions"></div>
-        <div class="modalTiny">Nicht nur Geld zählt: Stabilität, Komfort und Soziales verändern sich.</div>
+        <div class="modalTiny">Hinweis: Stabilität, Komfort und Soziales verändern sich messbar.</div>
       </div>
     </div>
 
@@ -397,11 +389,22 @@
       </div>
     </div>
 
+    <!-- MODAL: END -->
+    <div class="modal hidden" id="endModal" role="dialog" aria-modal="true">
+      <div class="modalCard">
+        <div class="modalTitle" id="endTitle">Auswertung</div>
+        <div class="modalText" id="endBody"></div>
+        <div class="modalActions">
+          <button class="btn primary" id="endOk" type="button">Schließen</button>
+        </div>
+      </div>
+    </div>
+
     <!-- DRAWER: GLOSSARY -->
     <div class="drawer hidden" id="glossaryDrawer" aria-hidden="true">
       <div class="drawerCard">
         <div class="drawerHead">
-          <strong>Begriffe – kurz erklärt</strong>
+          <strong>Begriffe – kurz</strong>
           <button class="hudBtn ghost" id="btnCloseGlossary" type="button">✕</button>
         </div>
         <div class="drawerBody" id="glossaryContent"></div>
@@ -410,7 +413,7 @@
 
     <!-- TOAST -->
     <div class="toast hidden" id="toast">
-      <div class="toastTitle" id="toastTitle">Achievement</div>
+      <div class="toastTitle" id="toastTitle">Info</div>
       <div class="toastText" id="toastText"></div>
     </div>
   </main>
