@@ -215,7 +215,7 @@ body{
 /* GAME HUD */
 .gameHud{
   display:grid;
-  grid-template-columns: 160px 220px 180px 1fr;
+  grid-template-columns: 140px 220px 170px 1fr 1fr 1fr;
   gap:10px;
   margin-bottom:10px;
 }
@@ -227,7 +227,6 @@ body{
   padding:12px;
   box-shadow: 0 10px 24px rgba(15,23,42,.08);
 }
-.statCard.grow{grid-column: span 1;}
 .statLabel{font-size:12px; color:var(--muted); font-weight:1000;}
 .statValue{font-size:18px; font-weight:1100; margin-top:4px;}
 .statTiny{font-size:12px; color:var(--muted); margin-top:4px;}
