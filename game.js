@@ -1,17 +1,27 @@
-"use strict";
+/* MoneyQuest – vNext
+   Added:
+   - Dispo limit (hard floor) + "Kontosperre" decision if exceeded
+   - Withdrawals from sub-buckets + cash buffer + ETF (sell fee)
+   - More game feel: phases, shop offers, risk cards, more achievements
+*/
 
-/* =========================================================
-   MoneyQuest – vNext (Card Mode + Shop Screen + Inventory + Achievements)
-   - Card-mode month loop (phase cards)
-   - Separate Shop screen with buyable assets
-   - Inventory assets persist + can give passive perks
-   - Achievements overlay + mini badges
-   ========================================================= */
+"use strict";
 
 // ---------- helpers ----------
 const el = (id) => document.getElementById(id);
-const clamp = (n,a,b)=> Math.max(a, Math.min(b,n));
 
+function clamp(n, a, b){ return Math.max(a, Math.min(b, n)); }
+function rand(a,b){ return a + Math.random()*(b-a); }
+function randn(){
+  // Box-Muller
+  let u=0,v=0;
+  while(u===0) u=Math.random();
+  while(v===0) v=Math.random();
+  return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);
+}
+function uid(){
+  return "b" + Math.random().toString(16).slice(2,10);
+}
 function formatEUR(x){
   const n = Math.round(x);
   const sign = n < 0 ? "-" : "";
@@ -19,52 +29,65 @@ function formatEUR(x){
   const s = abs.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
   return `${sign}${s} €`;
 }
+
 function toast(title, text){
   el("toastTitle").textContent = title;
   el("toastText").textContent = text;
   el("toast").classList.remove("hidden");
-  setTimeout(()=> el("toast").classList.add("hidden"), 2200);
+  setTimeout(()=> el("toast").classList.add("hidden"), 2400);
 }
-function sleep(ms){ return new Promise(r=>setTimeout(r, ms)); }
 
 // ---------- avatar ----------
 function drawAvatar(seed){
   const c = el("avatar");
   const ctx = c.getContext("2d");
+  const w = c.width, h = c.height;
+
+  // crisp pixels
   ctx.imageSmoothingEnabled = false;
 
+  // simple seeded RNG
   let s = seed || 1337;
   const r = () => (s = (s*1664525 + 1013904223) >>> 0) / 4294967296;
 
   const bg = ["#E2E8F0","#DCFCE7","#E0F2FE","#FEF3C7","#FCE7F3"][Math.floor(r()*5)];
   ctx.fillStyle = bg;
-  ctx.fillRect(0,0,16,16);
+  ctx.fillRect(0,0,w,h);
 
+  // face block
   const skin = ["#F2D6C9","#F6E0C6","#DDB7A0","#CFA08A","#EBC7B0"][Math.floor(r()*5)];
   ctx.fillStyle = skin;
   ctx.fillRect(4,4,8,8);
 
+  // hair
   const hair = ["#111827","#1F2937","#3F3F46","#7C2D12","#4B5563"][Math.floor(r()*5)];
   ctx.fillStyle = hair;
   ctx.fillRect(4,4,8,3);
 
+  // eyes
   ctx.fillStyle = "#111827";
   ctx.fillRect(6,7,1,1);
   ctx.fillRect(9,7,1,1);
+
+  // mouth
   ctx.fillRect(7,10,2,1);
 
+  // shirt
   const shirt = ["#2563EB","#16A34A","#F97316","#7C3AED","#0EA5E9"][Math.floor(r()*5)];
   ctx.fillStyle = shirt;
   ctx.fillRect(4,12,8,4);
+
+  // tiny accent
   ctx.fillStyle = "rgba(255,255,255,.85)";
   ctx.fillRect(7,13,2,1);
 }
+
 function regenAvatar(){
-  state.salt++;
+  state.salt += 1;
   drawAvatar((Date.now() + state.salt) & 0xffffffff);
 }
 
-// ---------- economy model ----------
+// ---------- data ----------
 const JOB_NET = {
   it:         { ausbildung: 1100, studium: 950, job: 2500 },
   pflege:     { ausbildung: 1150, studium: 1000, job: 2300 },
@@ -86,21 +109,30 @@ function familyCosts(family){
   return 0;
 }
 
-function lifestyleBudgets(p){
-  const food = p.lifeFood === "sparsam" ? 240 : (p.lifeFood === "teuer" ? 380 : 300);
-  const fun  = p.lifeFun === "low" ? 70 : (p.lifeFun === "high" ? 170 : 120);
-  const shop = p.lifeShop === "low" ? 50 : (p.lifeShop === "high" ? 160 : 100);
-  const subs = p.lifeSubs === "none" ? 0 : (p.lifeSubs === "many" ? 35 : 18);
-  const mobility = p.lifeMobility === "car" ? 220 : (p.lifeMobility === "ticket" ? 69 : 20);
-  return { food, fun, shop, subs, mobility, hasCar: p.lifeMobility === "car" };
+function lifestyleBudgets(profile){
+  const food = profile.lifeFood === "sparsam" ? 240 : (profile.lifeFood === "teuer" ? 380 : 300);
+  const fun  = profile.lifeFun === "low" ? 70 : (profile.lifeFun === "high" ? 170 : 120);
+  const shop = profile.lifeShop === "low" ? 50 : (profile.lifeShop === "high" ? 160 : 100);
+  const subs = profile.lifeSubs === "none" ? 0 : (profile.lifeSubs === "many" ? 35 : 18);
+  const mobility = profile.lifeMobility === "car" ? 220 : (profile.lifeMobility === "ticket" ? 69 : 20);
+  const hasCar = profile.lifeMobility === "car";
+  return { food, fun, shop, subs, mobility, hasCar };
 }
 
 // ---------- insurance ----------
 const INSURANCE = [
-  { id:"haftpflicht", name:"Haftpflicht", price:6, cat:"Basis", badge:"base", hint:"Schäden an anderen (Details per Ereignis)." },
-  { id:"hausrat", name:"Hausrat", price:12, cat:"Komfort", badge:"comfort", hint:"Dinge in der Wohnung (Details per Ereignis)." },
-  { id:"handy", name:"Handyversicherung", price:15, cat:"Risiko", badge:"risk", hint:"Handy-Schutz (Details per Ereignis)." },
-  { id:"rechtsschutz", name:"Rechtsschutz", price:18, cat:"Komfort", badge:"comfort", hint:"Konflikt/Vertrag/Ärger (Details per Ereignis)." },
+  { id:"haftpflicht", name:"Haftpflicht", price:6, cat:"Basis", badge:"base",
+    hint:"Schäden an anderen (Details per Ereignis)."
+  },
+  { id:"hausrat", name:"Hausrat", price:12, cat:"Komfort", badge:"comfort",
+    hint:"Dinge in der Wohnung (Details per Ereignis)."
+  },
+  { id:"handy", name:"Handyversicherung", price:15, cat:"Risiko", badge:"risk",
+    hint:"Handy-Schutz (Details per Ereignis)."
+  },
+  { id:"rechtsschutz", name:"Rechtsschutz", price:18, cat:"Komfort", badge:"comfort",
+    hint:"Konflikt/Vertrag/Ärger (Details per Ereignis)."
+  },
 ];
 
 function insuranceSum(g){
@@ -108,18 +140,51 @@ function insuranceSum(g){
   for(const ins of INSURANCE) if(g.insurance[ins.id]) sum += ins.price;
   return sum;
 }
-function unlockInsuranceHint(g, hint){
-  if(g.insuranceHints.has(hint)) return;
-  g.insuranceHints.add(hint);
-  toast("Hinweis", hint);
+
+function renderInsuranceList(g){
+  const root = el("insuranceList");
+  root.innerHTML = "";
+  for(const ins of INSURANCE){
+    const on = !!g.insurance[ins.id];
+    const div = document.createElement("div");
+    div.className = "insItem";
+    div.innerHTML = `
+      <div class="insTop">
+        <div class="insName">${ins.name}</div>
+        <div class="insPrice">${formatEUR(ins.price)}/Monat</div>
+      </div>
+      <div class="badge ${ins.badge}">${ins.cat}</div>
+      <div class="insDesc">${ins.hint}</div>
+      <label class="insToggle">
+        <input type="checkbox" data-ins="${ins.id}" ${on ? "checked":""}/>
+        Aktivieren
+      </label>
+    `;
+    root.appendChild(div);
+  }
+  root.querySelectorAll('input[type="checkbox"][data-ins]').forEach(cb => {
+    cb.addEventListener("change", (e) => {
+      const id = e.target.getAttribute("data-ins");
+      g.insurance[id] = e.target.checked;
+      timelineClear();
+      timelineInfo("Versicherung geändert", "Abwägung: laufende Kosten vs. Risiko.");
+      renderGame();
+    });
+  });
+
+  const unlocked = [...g.insuranceHints];
+  el("insuranceUnlockedHint").textContent = unlocked.length
+    ? "Freigeschaltete Hinweise: " + unlocked.join(" • ")
+    : "Hinweise werden durch passende Ereignisse freigeschaltet.";
 }
 
-// ---------- loans ----------
+// ---------- credit types (fixed APR) ----------
 const LOAN_TYPES = {
   konsum: { label:"Konsum", apr: 6.0, minMonths: 12, maxMonths: 48 },
   auto:   { label:"Auto",   apr: 4.0, minMonths: 12, maxMonths: 60 },
   dispo:  { label:"Dispo",  apr: 11.0, minMonths: 6,  maxMonths: 24 },
 };
+
 function calcMonthlyRate(amount, months, apr){
   if(amount <= 0) return 0;
   const r = (apr/100) / 12;
@@ -127,228 +192,88 @@ function calcMonthlyRate(amount, months, apr){
   return amount * (r * Math.pow(1+r, months)) / (Math.pow(1+r, months)-1);
 }
 
-// ---------- assets (shop + inventory) ----------
-const ASSETS = [
-  {
-    id:"bike",
-    icon:"🚲",
-    name:"Fahrrad",
-    cost:400,
-    desc:"Flexibler Alltag. Spart langfristig Mobilitätskosten.",
-    impact:{ comfort:+6, social:+1, stability:+1 },
-    passive:{ mobilityMinus:20 }
-  },
-  {
-    id:"laptop",
-    icon:"💻",
-    name:"Laptop (Refurb)",
-    cost:450,
-    desc:"Hilft für Schule/Job. Gibt Stabilität durch bessere Organisation.",
-    impact:{ comfort:+3, social:+1, stability:+3 },
-    passive:{}
-  },
-  {
-    id:"furniture",
-    icon:"🛋️",
-    name:"Möbel-Upgrade",
-    cost:500,
-    desc:"Wohnen wird deutlich nicer.",
-    impact:{ comfort:+10, social:+1, stability:0 },
-    passive:{}
-  },
-  {
-    id:"phone",
-    icon:"📱",
-    name:"Neues Handy",
-    cost:800,
-    desc:"Praktisch, social boost – aber teuer.",
-    impact:{ comfort:+4, social:+6, stability:-1 },
-    passive:{}
-  },
-  {
-    id:"kitchen",
-    icon:"🍳",
-    name:"Meal-Prep Setup",
-    cost:120,
-    desc:"Bessere Essensplanung: reduziert Essen-Budget leicht.",
-    impact:{ comfort:+1, social:0, stability:+3 },
-    passive:{ foodMinus:20 }
-  },
-  {
-    id:"course",
-    icon:"🏋️",
-    name:"Sportkurs (Abo)",
-    cost:90,
-    desc:"Stabilisiert Wohlbefinden. Kleiner Social Boost.",
-    impact:{ comfort:+2, social:+3, stability:+2 },
-    passive:{}
-  }
-];
-
-function assetById(id){ return ASSETS.find(a=>a.id===id); }
-
-// ---------- achievements ----------
-const ACH = [
-  { id:"cash_1000", icon:"🧯", name:"Notgroschen 1k", text:"Du hast 1.000 € Notgroschen erreicht.", check:(g)=> g.buckets.cash >= 1000 },
-  { id:"cash_2000", icon:"🛡️", name:"Puffer-Profi", text:"2.000 € Notgroschen – stabil.", check:(g)=> g.buckets.cash >= 2000 },
-  { id:"etf_2000",  icon:"📈", name:"Investor", text:"ETF-Depot über 2.000 €.", check:(g)=> g.buckets.etf >= 2000 },
-  { id:"no_red_6",  icon:"✨", name:"Clean Run", text:"6 Monate ohne Minus!", check:(g)=> g.month >= 6 && g.redMonths === 0 },
-  { id:"red_3",     icon:"🧱", name:"Überlebt", text:"3 Minus-Monate überstanden.", check:(g)=> g.redMonths >= 3 },
-  { id:"stable_80", icon:"🗿", name:"Fels", text:"Stabilität ≥ 80.", check:(g)=> g.stability >= 80 },
-  { id:"social_80", icon:"🫶", name:"Social Pro", text:"Soziales ≥ 80.", check:(g)=> g.social >= 80 },
-  { id:"buy_3",     icon:"🎒", name:"Ausgerüstet", text:"3 Assets im Inventar.", check:(g)=> g.assets.length >= 3 },
-];
-
-function achUnlock(g, ach){
-  if(g.achievements.has(ach.id)) return;
-  g.achievements.add(ach.id);
-
-  // overlay mini
-  renderAchievements(g);
-
-  // toast
-  el("achToastTitle").textContent = `🏆 ${ach.name}`;
-  el("achToastText").textContent = ach.text;
-  el("achToast").classList.remove("hidden");
-  setTimeout(()=> el("achToast").classList.add("hidden"), 2600);
-}
-
-function checkAchievements(g){
-  for(const a of ACH){
-    if(a.check(g)) achUnlock(g, a);
-  }
-}
-
-// ---------- state ----------
-const state = {
-  salt: 0,
-  profile: null,
-  game: null,
-  view: "interview", // interview | game | shop
-  cardQueue: [],
-  cardLocked: false,
-};
-
-// ---------- initial stats ----------
-function initialComfort(p){
-  let c = 55;
-  if(p.living === "eltern") c += 10;
-  if(p.living === "wg") c += 4;
-  if(p.living === "miete") c += 6;
-  if(p.living === "eigentum") c += 8;
-  if(p.lifeMobility === "car") c += 10;
-  if(p.lifeMobility === "ticket") c += 4;
-  if(p.lifeMobility === "bike") c += 2;
-  if(p.lifeSubs === "many") c += 4;
-  if(p.lifeSubs === "none") c -= 2;
-  return clamp(c,0,100);
-}
-function initialSocial(p){
-  let s = 52;
-  if(p.lifeFun === "high") s += 12;
-  if(p.lifeFun === "mid") s += 6;
-  if(p.lifeFun === "low") s -= 2;
-  if(p.family === "single") s += 2;
-  if(p.family === "kind") s -= 3;
-  return clamp(s,0,100);
-}
-
-// ---------- new game ----------
-function newGame(profile){
-  const income = JOB_NET[profile.field]?.[profile.path] ?? 1700;
-  const living = LIVING[profile.living] ?? LIVING.wg;
-  const life = lifestyleBudgets(profile);
-
-  return {
-    month: 1,
-    balance: 350,
-    income,
-
-    // hard rule: dispo floor
-    dispoFloor: -500,
-
-    fixed: {
-      rent: living.rent,
-      utilities: living.utilities,
-      internet: living.internet,
-      phone: 20,
-      family: familyCosts(profile.family),
-    },
-    variable: {
-      food: life.food,
-      fun: life.fun,
-      shop: life.shop,
-      subs: life.subs,
-      mobility: life.mobility,
-    },
-
-    insurance: { haftpflicht:true, hausrat:false, handy:false, rechtsschutz:false },
-    insuranceHints: new Set(),
-
-    loan: { active:false, principal:0, monthsLeft:0, rate:0, apr:0, type:"" },
-
-    buckets: {
-      cash: 0,
-      etf: 0,
-      subs: [
-        { id:"b1", name:"Urlaub", balance:0, plan:50 },
-        { id:"b2", name:"Puffer", balance:0, plan:50 },
-      ],
-    },
-    plan: { cash:100, etf:100 },
-
-    redMonths: 0,
-    stability: 55,
-    comfort: initialComfort(profile),
-    social: initialSocial(profile),
-
-    achievements: new Set(),
-    assets: [], // array of asset ids
-
-    historyBalance: [350],
-    historyEtf: [0],
-
-    hasRunThisMonth: false,
+// ---------- modals ----------
+function showEventModal(ev, onClose){
+  el("eventTitle").textContent = ev.title;
+  el("eventText").textContent = ev.text;
+  el("eventModal").classList.remove("hidden");
+  const ok = el("eventOk");
+  const handler = () => {
+    ok.removeEventListener("click", handler);
+    el("eventModal").classList.add("hidden");
+    onClose?.();
   };
+  ok.addEventListener("click", handler);
 }
 
-// ---------- derived / stability ----------
-function recomputeStability(g){
-  let s = 40;
-  s += Math.min(30, Math.floor(g.buckets.cash / 50));
-  if(g.balance < 0) s -= 18;
-  s -= g.redMonths * 6;
-  if(g.buckets.etf >= 200) s += 6;
-  if(g.buckets.etf >= 1000) s += 8;
-  if(g.loan.active) s -= 8;
-  if(g.insurance.haftpflicht) s += 3;
-  g.stability = clamp(s, 0, 100);
+function showChoiceModal(choice, onPick){
+  el("choiceTitle").textContent = choice.title;
+  el("choiceText").textContent = choice.text;
+
+  const wrap = el("choiceActions");
+  wrap.innerHTML = "";
+
+  const mkPill = (label, v) => {
+    const cls = v > 0 ? "good" : (v < 0 ? "bad" : "neu");
+    const sign = v > 0 ? "+" : "";
+    return `<span class="pill ${cls}">${label}: ${sign}${v}</span>`;
+  };
+
+  const mk = (opt) => {
+    const btn = document.createElement("button");
+    btn.className = "choiceBtn";
+    btn.type = "button";
+
+    const moneyCls = opt.money > 0 ? "good" : (opt.money < 0 ? "bad" : "neu");
+    const moneyText = `${opt.money > 0 ? "+" : ""}${formatEUR(opt.money)}`;
+    const pills = [];
+    pills.push(`<span class="pill ${moneyCls}">${moneyText}</span>`);
+    pills.push(mkPill("Stabil", opt.stability));
+    pills.push(mkPill("Komfort", opt.comfort));
+    pills.push(mkPill("Soziales", opt.social));
+
+    btn.innerHTML = `
+      <div class="choiceTitle">${opt.label}</div>
+      <div class="choiceMeta">${opt.meta}</div>
+      <div class="choiceImpact">${pills.join("")}</div>
+    `;
+    btn.addEventListener("click", () => {
+      el("choiceModal").classList.add("hidden");
+      onPick(opt);
+    });
+    return btn;
+  };
+
+  wrap.appendChild(mk(choice.a));
+  wrap.appendChild(mk(choice.b));
+
+  el("choiceModal").classList.remove("hidden");
 }
 
-function computeFixedSum(g){
-  const f = g.fixed, v = g.variable;
-  return f.rent + f.utilities + f.internet + f.phone + f.family + v.food + v.fun + v.shop + v.subs + v.mobility;
+// ---------- modal helpers (promise) ----------
+function showEventModalAsync(ev){
+  return new Promise(resolve => showEventModal(ev, resolve));
 }
+function showChoiceModalAsync(choice){
+  return new Promise(resolve => showChoiceModal(choice, resolve));
+}
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
 
-// ---------- passive asset effects ----------
-function applyPassivePerks(g){
-  // reset variable baselines from profile? (simplified: only apply deltas once per month before costs)
-  // We apply perks as reductions to certain budget categories.
-  let foodMinus = 0;
-  let mobilityMinus = 0;
-
-  for(const id of g.assets){
-    const a = assetById(id);
-    if(!a?.passive) continue;
-    foodMinus += (a.passive.foodMinus || 0);
-    mobilityMinus += (a.passive.mobilityMinus || 0);
-  }
-
-  g._passive = { foodMinus, mobilityMinus };
+function showEndModal(html){
+  el("endTitle").textContent = "Auswertung";
+  el("endBody").innerHTML = html;
+  el("endModal").classList.remove("hidden");
+  const ok = el("endOk");
+  const handler = () => {
+    ok.removeEventListener("click", handler);
+    el("endModal").classList.add("hidden");
+  };
+  ok.addEventListener("click", handler);
 }
 
 // ---------- timeline ----------
 function timelineClear(){ el("gLog").innerHTML = ""; }
+
 function timelineItem(title, amount, sub, dotColor=null){
   const item = document.createElement("div");
   item.className = "tItem";
@@ -382,58 +307,207 @@ function timelineItem(title, amount, sub, dotColor=null){
   item.appendChild(amt);
   el("gLog").appendChild(item);
 }
+
 function timelineInfo(title, sub){
   timelineItem(title, 0, sub, "#0EA5E9");
 }
 
-// ---------- render helpers ----------
-function setView(view){
-  state.view = view;
+// ---------- charts ----------
+function drawLineChart(canvasId, values){
+  const c = el(canvasId);
+  const ctx = c.getContext("2d");
+  const w = c.width, h = c.height;
 
-  el("screenInterview").classList.toggle("hidden", view !== "interview");
-  el("screenGame").classList.toggle("hidden", view !== "game");
-  el("screenShop").classList.toggle("hidden", view !== "shop");
+  ctx.clearRect(0,0,w,h);
 
-  el("hudStep").textContent = view === "interview" ? "Interview" : (view === "shop" ? "Shop" : "Spiel");
-}
+  const padL = 34, padR = 10, padT = 14, padB = 18;
+  const plotW = w - padL - padR;
+  const plotH = h - padT - padB;
 
-// ---------- render game stats / panels ----------
-function renderInsuranceList(g){
-  const root = el("insuranceList");
-  root.innerHTML = "";
-  for(const ins of INSURANCE){
-    const on = !!g.insurance[ins.id];
-    const div = document.createElement("div");
-    div.className = "insItem";
-    div.innerHTML = `
-      <div class="insTop">
-        <div class="insName">${ins.name}</div>
-        <div class="insPrice">${formatEUR(ins.price)}/Monat</div>
-      </div>
-      <div class="badge ${ins.badge}">${ins.cat}</div>
-      <div class="insDesc">${ins.hint}</div>
-      <label class="insToggle">
-        <input type="checkbox" data-ins="${ins.id}" ${on ? "checked":""}/>
-        Aktivieren
-      </label>
-    `;
-    root.appendChild(div);
+  const minV = Math.min(...values, 0);
+  const maxV = Math.max(...values, 1);
+  const range = (maxV - minV) || 1;
+
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = "rgba(15,23,42,.08)";
+  for(let i=0;i<=4;i++){
+    const y = padT + (plotH * i/4);
+    ctx.beginPath();
+    ctx.moveTo(padL, y);
+    ctx.lineTo(padL + plotW, y);
+    ctx.stroke();
   }
 
-  root.querySelectorAll('input[type="checkbox"][data-ins]').forEach(cb=>{
-    cb.addEventListener("change",(e)=>{
-      const id = e.target.getAttribute("data-ins");
-      g.insurance[id] = e.target.checked;
-      timelineClear();
-      timelineInfo("Versicherung geändert", "Laufende Kosten vs. Risiko.");
-      renderAll();
-    });
+  ctx.fillStyle = "rgba(15,23,42,.55)";
+  ctx.font = "12px system-ui";
+  ctx.fillText(`${Math.round(maxV)}`, 6, padT+10);
+  ctx.fillText(`${Math.round(minV)}`, 6, padT+plotH);
+
+  ctx.strokeStyle = "rgba(79,70,229,.95)";
+  ctx.lineWidth = 3;
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+
+  const xAt = (i)=> padL + (plotW * (values.length === 1 ? 0 : i/(values.length-1)));
+  const yAt = (v)=> padT + plotH - ((v - minV)/range)*plotH;
+
+  ctx.beginPath();
+  values.forEach((v,i)=>{
+    const x = xAt(i);
+    const y = yAt(v);
+    if(i===0) ctx.moveTo(x,y);
+    else ctx.lineTo(x,y);
+  });
+  ctx.stroke();
+
+  values.forEach((v,i)=>{
+    const x = xAt(i);
+    const y = yAt(v);
+    ctx.fillStyle = "rgba(22,163,74,.95)";
+    ctx.beginPath();
+    ctx.arc(x,y,4,0,Math.PI*2);
+    ctx.fill();
   });
 
-  const unlocked = [...g.insuranceHints];
-  el("insuranceUnlockedHint").textContent = unlocked.length
-    ? "Freigeschaltete Hinweise: " + unlocked.join(" • ")
-    : "Hinweise werden durch passende Ereignisse freigeschaltet.";
+  if(minV < 0 && maxV > 0){
+    const y0 = yAt(0);
+    ctx.strokeStyle = "rgba(220,38,38,.35)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(padL, y0);
+    ctx.lineTo(padL+plotW, y0);
+    ctx.stroke();
+  }
+}
+
+// ---------- state ----------
+const state = { salt:0, profile:null, game:null };
+
+// ---------- comfort/social ----------
+function initialComfort(profile){
+  let c = 55;
+  if(profile.living === "eltern") c += 10;
+  if(profile.living === "wg") c += 4;
+  if(profile.living === "miete") c += 6;
+  if(profile.living === "eigentum") c += 8;
+
+  if(profile.lifeMobility === "car") c += 10;
+  if(profile.lifeMobility === "ticket") c += 4;
+  if(profile.lifeMobility === "bike") c += 2;
+
+  if(profile.lifeSubs === "many") c += 4;
+  if(profile.lifeSubs === "none") c -= 2;
+
+  return clamp(c, 0, 100);
+}
+function initialSocial(profile){
+  let s = 52;
+  if(profile.lifeFun === "high") s += 12;
+  if(profile.lifeFun === "mid") s += 6;
+  if(profile.lifeFun === "low") s -= 2;
+
+  if(profile.family === "single") s += 2;
+  if(profile.family === "kind") s -= 3;
+
+  return clamp(s, 0, 100);
+}
+
+// ---------- new game ----------
+function newGame(profile){
+  const income = JOB_NET[profile.field]?.[profile.path] ?? 1700;
+  const living = LIVING[profile.living] ?? LIVING.wg;
+  const life = lifestyleBudgets(profile);
+
+  return {
+    month: 1,
+    balance: 350,
+    income,
+
+    // HARD RULE: Dispo floor (no infinite minus)
+    dispoFloor: -500,
+
+    fixed: {
+      rent: living.rent,
+      utilities: living.utilities,
+      internet: living.internet,
+      phone: 20,
+      family: familyCosts(profile.family),
+    },
+    variable: {
+      food: life.food,
+      fun: life.fun,
+      shop: life.shop,
+      subs: life.subs,
+      mobility: life.mobility,
+    },
+    hasCar: life.hasCar,
+
+    insurance: { haftpflicht:true, hausrat:false, handy:false, rechtsschutz:false },
+    insuranceHints: new Set(),
+
+    loan: { active:false, principal:0, monthsLeft:0, rate:0, apr:0, type:"" },
+
+    buckets: {
+      cash: 0,
+      etf: 0,
+      subs: [
+        { id:"b1", name:"Urlaub", balance:0, plan:50 },
+        { id:"b2", name:"Puffer", balance:0, plan:50 },
+      ],
+    },
+    plan: { cash:100, etf:100 },
+
+    hasRunThisMonth:false,
+    redMonths:0,
+
+    stability: 55,
+    comfort: initialComfort(profile),
+    social: initialSocial(profile),
+
+    achievements: new Set(),
+    questTarget: 1000,
+
+    historyBalance: [350],
+    historyEtf: [0],
+
+    furnished: (profile.living === "eltern"),
+    bab: { eligible: profile.path === "ausbildung", active:false, amount:0 },
+
+    moveOutChoicePending: (profile.living !== "eltern"),
+    babChoicePending: (profile.path === "ausbildung"),
+
+    // meta for behavior
+    askedParentsEver: false,
+    refusedParentsEver: false,
+  };
+}
+
+function computeFixedSum(g){
+  const f = g.fixed;
+  const v = g.variable;
+  const babIncome = g.bab.active ? g.bab.amount : 0;
+  return (
+    f.rent + f.utilities + f.internet + f.phone + f.family +
+    v.food + v.fun + v.shop + v.subs + v.mobility
+  ) - babIncome;
+}
+
+function recomputeStability(g){
+  let s = 40;
+  s += Math.min(30, Math.floor(g.buckets.cash / 50));
+  if(g.balance < 0) s -= 18;
+  s -= g.redMonths * 6;
+  if(g.buckets.etf >= 200) s += 6;
+  if(g.buckets.etf >= 1000) s += 8;
+  if(g.loan.active) s -= 8;
+  if(g.insurance.haftpflicht) s += 3;
+  g.stability = clamp(s, 0, 100);
+}
+
+function renderQuest(g){
+  const pct = clamp((g.buckets.cash / g.questTarget) * 100, 0, 100);
+  el("gQuestText").textContent = `Notgroschen: ${formatEUR(g.buckets.cash)} / ${formatEUR(g.questTarget)} (${Math.round(pct)}%)`;
+  el("gQuestFill").style.width = `${pct}%`;
 }
 
 function renderBuckets(g){
@@ -452,247 +526,186 @@ function renderBuckets(g){
         <input type="number" min="0" step="10" value="${b.plan}" data-bucket="${b.id}" />
       </div>
       <div class="bucketActions">
-        <button class="btn soft" data-withdraw="${b.id}" type="button" title="Entnehmen">↩</button>
-        <button class="btn soft ghost" data-del="${b.id}" type="button" title="Löschen">✕</button>
+        <button class="btn soft" data-withdraw="${b.id}" type="button" title="Geld aus dem Topf ins Konto zurückholen">↩</button>
+        <button class="btn soft ghost" data-del="${b.id}" type="button" title="Topf löschen">✕</button>
       </div>
     `;
     root.appendChild(row);
   }
 
-  root.querySelectorAll('input[data-bucket]').forEach(inp=>{
-    inp.addEventListener("change",(e)=>{
+  root.querySelectorAll('input[data-bucket]').forEach(inp => {
+    inp.addEventListener("change", (e) => {
       const id = e.target.getAttribute("data-bucket");
       const val = Math.max(0, Number(e.target.value || 0));
-      const b = g.buckets.subs.find(x=>x.id===id);
+      const b = g.buckets.subs.find(x => x.id === id);
       if(b) b.plan = val;
       timelineClear();
-      timelineInfo("Unterkonto geändert", "Planbetrag angepasst.");
-      renderAll();
+      timelineInfo("Unterkonto-Plan geändert", "Unterkonten sind Spar-Töpfe. Du steuerst den Monatsbetrag.");
     });
   });
 
-  root.querySelectorAll('button[data-del]').forEach(btn=>{
-    btn.addEventListener("click",(e)=>{
+  root.querySelectorAll('button[data-del]').forEach(btn => {
+    btn.addEventListener("click", (e) => {
       const id = e.target.getAttribute("data-del");
-      g.buckets.subs = g.buckets.subs.filter(x=>x.id!==id);
+      g.buckets.subs = g.buckets.subs.filter(x => x.id !== id);
+      renderGame();
       timelineClear();
-      timelineInfo("Unterkonto gelöscht", "Topf entfernt.");
-      renderAll();
+      timelineInfo("Unterkonto gelöscht", "Spar-Topf entfernt.");
     });
   });
 
-  root.querySelectorAll('button[data-withdraw]').forEach(btn=>{
-    btn.addEventListener("click",(e)=>{
+  root.querySelectorAll('button[data-withdraw]').forEach(btn => {
+    btn.addEventListener("click", (e) => {
       const id = e.target.getAttribute("data-withdraw");
-      const b = g.buckets.subs.find(x=>x.id===id);
+      const b = g.buckets.subs.find(x => x.id === id);
       if(!b) return;
-      if(b.balance <= 0){ toast("Entnahme", "In diesem Topf ist nichts drin."); return; }
+      if(b.balance <= 0){
+        toast("Entnahme", "In diesem Topf ist gerade nichts drin.");
+        return;
+      }
 
-      const raw = prompt(`Wie viel € aus "${b.name}" entnehmen? (max. ${Math.round(b.balance)} €)`, "50");
+      const raw = prompt(`Wie viel € willst du aus "${b.name}" entnehmen? (max. ${Math.round(b.balance)} €)`, "50");
       if(raw === null) return;
+
       const amount = Math.floor(Number(raw));
-      if(!Number.isFinite(amount) || amount<=0){ toast("Entnahme","Bitte Zahl > 0."); return; }
-      if(amount > b.balance){ toast("Entnahme","Zu hoch."); return; }
+      if(!Number.isFinite(amount) || amount <= 0){
+        toast("Entnahme", "Bitte eine Zahl > 0 eingeben.");
+        return;
+      }
+      if(amount > b.balance){
+        toast("Entnahme", "Geht nicht: Betrag ist höher als der Stand im Topf.");
+        return;
+      }
 
       b.balance -= amount;
       g.balance += amount;
-      timelineItem(`Entnahme: ${b.name}`, +amount, `Neuer Topf-Stand: ${formatEUR(b.balance)}.`, "#7C3AED");
-      renderAll();
+
+      timelineClear();
+      timelineItem(`Entnahme: ${b.name}`, +amount, `Du holst Geld aus dem Topf zurück aufs Konto. Neuer Stand: ${formatEUR(b.balance)}.`, "#7C3AED");
+      renderGame();
     });
   });
 }
 
-function renderInventory(g){
-  const root = el("invGrid");
-  root.innerHTML = "";
+function renderGame(){
+  const g = state.game;
 
-  if(!g.assets.length){
-    el("invHint").textContent = "Noch leer. Im Shop kannst du Assets kaufen.";
-    return;
-  }
-  el("invHint").textContent = "";
-
-  for(const id of g.assets){
-    const a = assetById(id);
-    if(!a) continue;
-
-    const tags = [];
-    const mkTag = (label, v) => {
-      const cls = v>0 ? "good" : (v<0 ? "bad" : "neu");
-      const sign = v>0 ? "+" : "";
-      return `<span class="tag ${cls}">${label} ${sign}${v}</span>`;
-    };
-    tags.push(mkTag("Stabil", a.impact.stability||0));
-    tags.push(mkTag("Komfort", a.impact.comfort||0));
-    tags.push(mkTag("Soz.", a.impact.social||0));
-
-    const div = document.createElement("div");
-    div.className = "invItem";
-    div.innerHTML = `
-      <div class="invTop">
-        <div class="invName">${a.name}</div>
-        <div class="invIcon" aria-hidden="true">${a.icon}</div>
-      </div>
-      <div class="invDesc">${a.desc}</div>
-      <div class="invTags">${tags.join("")}</div>
-    `;
-    root.appendChild(div);
-  }
-}
-
-function renderAchievements(g){
-  el("achCount").textContent = String(g.achievements.size);
-
-  // show up to 6 mini badges (most recent-ish)
-  const row = el("achMiniRow");
-  row.innerHTML = "";
-  const unlocked = [...g.achievements].slice(-6);
-  for(const id of unlocked){
-    const a = ACH.find(x=>x.id===id);
-    const pill = document.createElement("div");
-    pill.className = "achMini";
-    pill.textContent = a ? `${a.icon} ${a.name}` : `🏆 ${id}`;
-    row.appendChild(pill);
-  }
-}
-
-function renderStats(g){
   recomputeStability(g);
 
+  el("hudStep").textContent = "Spiel";
   el("gMonth").textContent = g.month;
   el("gBalance").textContent = formatEUR(g.balance);
+  el("gIncome").textContent = formatEUR(g.income);
   el("gCash").textContent = formatEUR(g.buckets.cash);
   el("gEtf").textContent = formatEUR(g.buckets.etf);
 
-  const hint = g.balance < g.dispoFloor ? "Kontosperre (Dispo-Limit)" : (g.balance < 0 ? "Im Minus (Dispo)" : "OK");
-  el("gBalanceHint").textContent = hint;
+  // make KPIs actionable (withdraw/sell)
+  el("gCash").setAttribute("title","Klicken: Geld aus dem Notgroschen aufs Konto holen");
+  el("gEtf").setAttribute("title","Klicken: ETF-Anteile verkaufen (mit Gebühr)");
+  el("gCash").setAttribute("role","button");
+  el("gEtf").setAttribute("role","button");
+  el("gCash").setAttribute("tabindex","0");
+  el("gEtf").setAttribute("tabindex","0");
 
   el("gStabilityFill").style.width = `${g.stability}%`;
-  el("gComfortFill").style.width = `${g.comfort}%`;
-  el("gSocialFill").style.width = `${g.social}%`;
-
   el("gStabilityText").textContent = `${g.stability}/100`;
+
+  el("gComfortFill").style.width = `${g.comfort}%`;
   el("gComfortText").textContent = `${g.comfort}/100`;
+
+  el("gSocialFill").style.width = `${g.social}%`;
   el("gSocialText").textContent = `${g.social}/100`;
+
+  const hint =
+    g.balance < g.dispoFloor ? "Kontosperre (unter Dispo-Limit)" :
+    (g.balance < 0 ? "Im Minus (Dispo)" : "OK");
+  el("gBalanceHint").textContent = hint;
 
   el("inpCash").value = g.plan.cash;
   el("inpEtf").value = g.plan.etf;
+
+  el("btnRunMonth").disabled = g.hasRunThisMonth;
+  el("btnNextMonth").disabled = !g.hasRunThisMonth;
 
   el("loanStatus").textContent = g.loan.active
     ? `Aktiv: ${LOAN_TYPES[g.loan.type]?.label ?? "Kredit"} • Rate ${formatEUR(g.loan.rate)}/Monat • noch ${g.loan.monthsLeft} Monate`
     : "kein Kredit";
 
-  el("goalNote").innerHTML =
-    `Minus-Monate: <strong>${g.redMonths}</strong> • Dispo-Limit: <strong>${formatEUR(g.dispoFloor)}</strong> • ` +
-    `Stabilität <strong>${g.stability}</strong> • Komfort <strong>${g.comfort}</strong> • Soziales <strong>${g.social}</strong>.`;
-}
-
-function renderAll(){
-  const g = state.game;
-  if(!g) return;
-
-  renderStats(g);
   renderBuckets(g);
-  renderInventory(g);
   renderInsuranceList(g);
-  renderAchievements(g);
+  renderQuest(g);
 
-  if(state.view === "shop"){
-    renderShop(g);
-  }
+  el("goalNote").innerHTML =
+    `Minus-Monate: <strong>${g.redMonths}</strong> • ` +
+    `Dispo-Limit: <strong>${formatEUR(g.dispoFloor)}</strong> • ` +
+    `Stabilität <strong>${g.stability}</strong> • Komfort <strong>${g.comfort}</strong> • Soziales <strong>${g.social}</strong>.`;
+
+  drawLineChart("chartBalance", g.historyBalance);
+  drawLineChart("chartEtf", g.historyEtf);
 }
 
-// ---------- card system ----------
-function setCard({ badge, title, text, impacts = [], choices = [], footer = "" }){
-  el("cardBadge").textContent = badge || "—";
-  el("cardTitle").textContent = title || "—";
-  el("cardText").textContent = text || "—";
-  el("cardFooter").textContent = footer || "";
+// ---------- withdrawals (cash buffer / ETF) ----------
+const ETF_SELL_FEE_PCT = 0.01;   // 1% selling fee
+const ETF_SELL_FEE_MIN = 2;      // min fee in €
 
-  const imp = el("cardImpacts");
-  imp.innerHTML = "";
-  for(const p of impacts){
-    const div = document.createElement("div");
-    div.className = `impactPill ${p.cls || "neu"}`;
-    div.textContent = p.text;
-    imp.appendChild(div);
-  }
-
-  const wrap = el("cardChoices");
-  wrap.innerHTML = "";
-
-  for(const c of choices){
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "choiceCardBtn";
-    btn.disabled = !!c.disabled;
-
-    const impactTags = (c.impacts || []).map(p=>`<span class="impactPill ${p.cls||"neu"}">${p.text}</span>`).join("");
-
-    btn.innerHTML = `
-      <div class="choiceCardTitle">${c.label}</div>
-      <div class="choiceCardMeta">${c.meta || ""}</div>
-      <div class="choiceCardImpacts">${impactTags}</div>
-    `;
-    btn.addEventListener("click", ()=> c.onPick?.());
-    wrap.appendChild(btn);
-  }
+function promptAmount(title, max, preset="100"){
+  const raw = prompt(`${title} (max. ${Math.round(max)} €)`, preset);
+  if(raw === null) return null;
+  const amount = Math.floor(Number(raw));
+  if(!Number.isFinite(amount) || amount <= 0) return NaN;
+  return amount;
 }
-
-function pushCard(card){ state.cardQueue.push(card); }
-
-async function nextCard(){
-  if(state.cardLocked) return;
-  const card = state.cardQueue.shift();
-  if(!card){
-    // no cards queued -> show idle
-    setCard({
-      badge: "Bereit",
-      title: "Monat starten",
-      text: "Du spielst im Karten-Modus: 1 Karte = 1 Schritt. Starte den Monat, dann triff Entscheidungen.",
-      choices: [
-        { label:"▶ Monat starten", meta:"Spielt Einkommen → Kosten → Sparen → Events → Monatsende.",
-          impacts: [{cls:"neu",text:"12 Karten / max"}],
-          onPick: ()=> runMonthCardMode()
-        }
-      ],
-      footer: "Tipp: Log ist optional – falls man’s nachverfolgen will."
-    });
-    return;
-  }
-
-  state.cardLocked = true;
-  setCard(card);
-  state.cardLocked = false;
-}
-
-// ---------- withdrawals (cash + ETF) ----------
-const ETF_SELL_FEE_PCT = 0.01;
-const ETF_SELL_FEE_MIN = 2;
 
 function withdrawFromCash(){
   const g = state.game;
-  if(g.buckets.cash <= 0){ toast("Notgroschen","Da ist nichts drin."); return; }
-  const raw = prompt(`Wie viel € aus Notgroschen entnehmen? (max. ${Math.round(g.buckets.cash)} €)`, "100");
-  if(raw === null) return;
-  const amount = Math.floor(Number(raw));
-  if(!Number.isFinite(amount) || amount<=0){ toast("Notgroschen","Bitte Zahl > 0."); return; }
-  if(amount > g.buckets.cash){ toast("Notgroschen","Zu hoch."); return; }
+  if(!g) return;
+  if(g.buckets.cash <= 0){
+    toast("Notgroschen", "Da ist gerade nichts drin.");
+    return;
+  }
+
+  const amount = promptAmount("Wie viel € willst du aus dem Notgroschen entnehmen?", g.buckets.cash, "100");
+  if(amount === null) return;
+  if(Number.isNaN(amount)){
+    toast("Notgroschen", "Bitte eine Zahl > 0 eingeben.");
+    return;
+  }
+  if(amount > g.buckets.cash){
+    toast("Notgroschen", "Geht nicht: Betrag ist höher als dein Notgroschen.");
+    return;
+  }
 
   g.buckets.cash -= amount;
   g.balance += amount;
-  timelineItem("Notgroschen-Entnahme", +amount, `Neuer Stand: ${formatEUR(g.buckets.cash)}.`, "#16A34A");
-  renderAll();
+
+  timelineClear();
+  timelineItem(
+    "Notgroschen-Entnahme",
+    +amount,
+    `Du nutzt Rücklagen. Neuer Notgroschen-Stand: ${formatEUR(g.buckets.cash)}.`,
+    "#16A34A"
+  );
+  renderGame();
 }
 
 function sellEtf(){
   const g = state.game;
-  if(g.buckets.etf <= 0){ toast("ETF","Du hast kein ETF-Guthaben."); return; }
-  const raw = prompt(`Wie viel € ETF verkaufen? (max. ${Math.round(g.buckets.etf)} €)`, "200");
-  if(raw === null) return;
-  const amount = Math.floor(Number(raw));
-  if(!Number.isFinite(amount) || amount<=0){ toast("ETF","Bitte Zahl > 0."); return; }
-  if(amount > g.buckets.etf){ toast("ETF","Zu hoch."); return; }
+  if(!g) return;
+  if(g.buckets.etf <= 0){
+    toast("ETF", "Du hast aktuell kein ETF-Guthaben.");
+    return;
+  }
+
+  const amount = promptAmount("Wie viel € ETF willst du verkaufen?", g.buckets.etf, "200");
+  if(amount === null) return;
+  if(Number.isNaN(amount)){
+    toast("ETF", "Bitte eine Zahl > 0 eingeben.");
+    return;
+  }
+  if(amount > g.buckets.etf){
+    toast("ETF", "Geht nicht: Betrag ist höher als dein ETF-Depot.");
+    return;
+  }
 
   const fee = Math.max(ETF_SELL_FEE_MIN, Math.round(amount * ETF_SELL_FEE_PCT));
   const payout = Math.max(0, amount - fee);
@@ -700,232 +713,371 @@ function sellEtf(){
   g.buckets.etf -= amount;
   g.balance += payout;
 
-  timelineItem("ETF verkauft", +payout, `Verkauf ${formatEUR(amount)} • Gebühr ${formatEUR(fee)}.`, "#0EA5E9");
-  renderAll();
+  timelineClear();
+  timelineItem(
+    "ETF verkauft",
+    +payout,
+    `Verkauf ${formatEUR(amount)} • Gebühr ${formatEUR(fee)} • Auszahlung ${formatEUR(payout)}. Neuer Depot-Stand: ${formatEUR(g.buckets.etf)}.`,
+    "#0EA5E9"
+  );
+  renderGame();
 }
 
-// ---------- plan / buckets ----------
+// ---------- plan/buckets ----------
 function applyPlan(){
   const g = state.game;
   g.plan.cash = Math.max(0, Number(el("inpCash").value || 0));
   g.plan.etf  = Math.max(0, Number(el("inpEtf").value || 0));
-  timelineInfo("Plan gespeichert", "Wird im Monat automatisch angewendet.");
-  renderAll();
+  timelineClear();
+  timelineInfo("Plan gespeichert", "Wenn zu wenig übrig ist, wird automatisch gekürzt. Kein Invest aus dem Minus.");
+  renderGame();
 }
+
 function addBucket(){
   const g = state.game;
   const name = (el("newBucketName").value || "").trim();
-  if(!name){ toast("Unterkonto","Bitte Name eingeben."); return; }
-  const id = "b" + Math.random().toString(16).slice(2,8);
-  g.buckets.subs.push({ id, name, balance:0, plan:30 });
+  if(!name){
+    timelineClear();
+    timelineInfo("Unterkonto", "Gib einen Namen ein (z. B. Urlaub, Fahrrad, PC).");
+    return;
+  }
+  g.buckets.subs.push({ id: uid(), name, balance:0, plan:30 });
   el("newBucketName").value = "";
-  timelineInfo("Unterkonto angelegt", name);
-  renderAll();
+  renderGame();
+  timelineClear();
+  timelineInfo("Unterkonto angelegt", "Neuer Spar-Topf.");
 }
 
-// ---------- shop ----------
-function renderShop(g){
-  el("shopBalance").textContent = formatEUR(g.balance);
+// ---------- insurance hint unlock ----------
+function unlockInsuranceHint(g, hint){
+  if(g.insuranceHints.has(hint)) return;
+  g.insuranceHints.add(hint);
+  toast("Hinweis", hint);
+}
 
-  const root = el("shopGrid");
-  root.innerHTML = "";
+// ---------- ETF movement ----------
+function applyEtfMovement(g){
+  let r = 0.004 + randn() * 0.045;
+  if(Math.random() < 0.10){
+    r += rand(-0.08, 0.08);
+  }
+  r = clamp(r, -0.20, 0.20);
 
-  for(const a of ASSETS){
-    const owned = g.assets.includes(a.id);
-    const canBuy = !owned && g.balance >= a.cost;
+  const before = g.buckets.etf;
+  const change = Math.round(before * r);
+  g.buckets.etf += change;
 
-    const tags = [];
-    const mk = (label, v) => {
-      const cls = v>0 ? "good" : (v<0 ? "bad" : "neu");
-      const sign = v>0 ? "+" : "";
-      return `<span class="tag ${cls}">${label} ${sign}${v}</span>`;
-    };
-    tags.push(mk("Stabil", a.impact.stability||0));
-    tags.push(mk("Komfort", a.impact.comfort||0));
-    tags.push(mk("Soz.", a.impact.social||0));
+  const pct = Math.round(r*1000)/10;
+  return { change, pct };
+}
 
-    const card = document.createElement("div");
-    card.className = "shopCard";
-    card.innerHTML = `
-      <div class="shopCardHead">
-        <div class="shopCardTop">
-          <div class="shopCardName">${a.name}</div>
-          <div class="shopCardIcon" aria-hidden="true">${a.icon}</div>
-        </div>
-      </div>
-      <div class="shopCardBody">
-        <div class="shopCardDesc">${a.desc}</div>
-        <div class="shopCardTags">${tags.join("")}</div>
-      </div>
-      <div class="shopCardFoot">
-        <div class="pricePill">${formatEUR(a.cost)}</div>
-        <button class="btn ${owned ? "soft" : "primary"}" ${owned ? "disabled":""} ${(!owned && !canBuy) ? "disabled":""} type="button">
-          ${owned ? "Gekauft" : (canBuy ? "Kaufen" : "Zu teuer")}
-        </button>
-      </div>
-    `;
+// ---------- monthly choice pool ----------
+const CHOICES = [
+  {
+    title: "Essen & Trinken",
+    text: "Du merkst: Essen kippt den Monat. Was machst du?",
+    a: { label:"Meal Prep", meta:"Planen & vorkochen.", money:+70, stability:+6, comfort:-1, social:0 },
+    b: { label:"To-Go/Lieferung", meta:"Bequem, aber teuer.", money:-70, stability:-2, comfort:+2, social:+1 },
+  },
+  {
+    title: "Freizeit",
+    text: "Freunde fragen: Kino heute?",
+    a: { label:"Mitgehen", meta:"Kostet, aber du bist dabei.", money:-25, stability:-1, comfort:+1, social:+6 },
+    b: { label:"Absagen", meta:"Sparen, aber Isolation steigt.", money:+10, stability:+2, comfort:0, social:-4 },
+  },
+  {
+    title: "Shopping",
+    text: "Sale. Was passiert?",
+    a: { label:"Wunschliste", meta:"Nur 1 Teil kaufen.", money:+30, stability:+3, comfort:0, social:0 },
+    b: { label:"Spontan", meta:"3 Teile + Extras.", money:-90, stability:-3, comfort:+3, social:+1 },
+  },
+  {
+    title: "Abo-Check",
+    text: "Du merkst: Abos fressen Geld.",
+    a: { label:"Kündigen", meta:"2 Abos weg.", money:+18, stability:+3, comfort:-2, social:-1 },
+    b: { label:"Behalten", meta:"Bleibt so.", money:0, stability:-1, comfort:+1, social:0 },
+  },
+];
 
-    const btn = card.querySelector("button");
-    btn.addEventListener("click", ()=>{
-      if(owned) return;
-      if(g.balance < a.cost){ toast("Shop","Nicht genug Geld."); return; }
-      buyAsset(g, a.id);
-    });
+// ---------- shop (one-time purchases) ----------
+const SHOP_ITEMS = [
+  { id:"bike", name:"Fahrrad", cost:400, comfort:+6, social:+1, stability:+1, desc:"Günstiger als Auto, flexibler Alltag." },
+  { id:"phone", name:"Neues Handy", cost:800, comfort:+4, social:+4, stability:-1, desc:"Praktisch, aber teuer." },
+  { id:"furniture", name:"Möbel-Upgrade", cost:500, comfort:+8, social:+1, stability:0, desc:"Wohnung fühlt sich besser an." },
+  { id:"laptop", name:"Laptop (Refurb)", cost:450, comfort:+3, social:+1, stability:+2, desc:"Hilft für Schule/Job, sinnvoll." },
+  { id:"gym", name:"Sportkurs (3 Monate)", cost:90, comfort:+1, social:+3, stability:+2, desc:"Gesundheit/Stress – wirkt indirekt." },
+  { id:"trip", name:"Mini-Trip", cost:180, comfort:+2, social:+6, stability:-2, desc:"Erlebnis + Social, kostet Budget." },
+];
 
-    root.appendChild(card);
+function pickTwoDistinct(arr){
+  if(arr.length <= 2) return arr.slice(0,2);
+  const a = arr[Math.floor(Math.random()*arr.length)];
+  let b = arr[Math.floor(Math.random()*arr.length)];
+  let guard = 0;
+  while(b.id === a.id && guard++ < 8){
+    b = arr[Math.floor(Math.random()*arr.length)];
+  }
+  return [a,b];
+}
+
+function shopChoiceForMonth(g){
+  // avoid repeating too often: 45% chance
+  if(Math.random() > 0.45) return null;
+  const [a] = pickTwoDistinct(SHOP_ITEMS);
+
+  const optFrom = (it)=>({
+    label:`${it.name} (${formatEUR(it.cost)})`,
+    meta: it.desc,
+    money: -it.cost,
+    stability: it.stability,
+    comfort: it.comfort,
+    social: it.social,
+    _shopId: it.id,
+  });
+
+  return {
+    title: "Shop / Upgrade",
+    text: "Du siehst etwas, das deinen Alltag verbessern könnte. Kaufst du es?",
+    a: optFrom(a),
+    b: { label:"Nichts kaufen", meta:"Du sparst dieses Mal.", money:0, stability:+1, comfort:0, social:0 },
+  };
+}
+
+// ---------- risk cards ----------
+const RISK_CARDS = [
+  {
+    title:"Risiko: Krypto-Hype",
+    text:"Ein Freund schwört auf einen Coin. Chance oder Falle?",
+    a:{ label:"Nein", meta:"Du lässt es.", money:0, stability:+1, comfort:0, social:0 },
+    b:{ label:"500 € investieren", meta:"50/50: Rückzahlung 800 € oder 300 €", money:0, stability:-2, comfort:+1, social:+1,
+        _risk:{ stake:500, returnWin:800, returnLose:300, pWin:0.5, labelWin:"Krypto pumpt", labelLose:"Krypto crasht" } },
+  },
+  {
+    title:"Risiko: Gebrauchtwagen-Deal",
+    text:"Ein günstiges Auto-Angebot – aber unklarer Zustand.",
+    a:{ label:"Nein", meta:"Zu unsicher.", money:0, stability:+1, comfort:0, social:0 },
+    b:{ label:"Kaufen (700 €)", meta:"40% ok, 60% Reparatur 350 €", money:-700, stability:-3, comfort:+3, social:+1,
+        _risk:{ pWin:0.40, win:0, lose:350, labelWin:"Glücksgriff", labelLose:"Reparatur" } },
+  },
+];
+
+function riskChoiceForMonth(g){
+  // 25% chance
+  if(Math.random() > 0.25) return null;
+  return RISK_CARDS[Math.floor(Math.random()*RISK_CARDS.length)];
+}
+
+function resolveRisk(g, risk){
+  const p = risk.pWin ?? 0.5;
+
+  // stake/return mode (deduct stake, then add back return)
+  if(Number.isFinite(risk.stake) && (Number.isFinite(risk.returnWin) || Number.isFinite(risk.returnLose))){
+    const stake = Math.max(0, Math.round(risk.stake));
+    if(stake > 0){
+      g.balance -= stake;
+      timelineItem("Einsatz", -stake, "Risiko-Entscheidung.", "#EA580C");
+    }
+
+    const win = Math.random() < p;
+    const ret = Math.max(0, Math.round(win ? (risk.returnWin ?? 0) : (risk.returnLose ?? 0)));
+    if(ret > 0){
+      g.balance += ret;
+      timelineItem(win ? (risk.labelWin || "Ausgang") : (risk.labelLose || "Ausgang"), ret - stake, "Zufallsausgang.", win ? "#16A34A" : "#DC2626");
+    } else {
+      timelineInfo(win ? (risk.labelWin || "Ausgang") : (risk.labelLose || "Ausgang"), "Kein Return.");
+    }
+
+    if(win){
+      g.stability = clamp(g.stability + 2, 0, 100);
+    } else {
+      g.stability = clamp(g.stability - 4, 0, 100);
+      g.comfort = clamp(g.comfort - 1, 0, 100);
+    }
+    return;
+  }
+
+  // delta mode
+  const win = Math.random() < p;
+  if(win){
+    const gain = Math.round(risk.win ?? 0);
+    if(gain){
+      g.balance += gain;
+      timelineItem(risk.labelWin || "Risk: Gewinn", +gain, "Zufallsausgang.", "#16A34A");
+    } else {
+      timelineInfo(risk.labelWin || "Risk: Glück gehabt", "Dieses Mal keine Zusatzkosten.");
+    }
+    g.stability = clamp(g.stability + 2, 0, 100);
+  } else {
+    const loss = Math.round(risk.lose ?? 0);
+    if(loss){
+      g.balance -= loss;
+      timelineItem(risk.labelLose || "Risk: Verlust", -loss, "Zufallsausgang.", "#DC2626");
+    } else {
+      timelineInfo(risk.labelLose || "Risk: Pech", "Negatives Ergebnis.");
+    }
+    g.stability = clamp(g.stability - 4, 0, 100);
+    g.comfort = clamp(g.comfort - 1, 0, 100);
   }
 }
 
-function buyAsset(g, assetId){
-  const a = assetById(assetId);
-  if(!a) return;
-  if(g.assets.includes(assetId)) return;
-
-  g.balance -= a.cost;
-  g.assets.push(assetId);
-
-  // apply immediate stat impact
-  g.stability = clamp(g.stability + (a.impact.stability||0), 0, 100);
-  g.comfort = clamp(g.comfort + (a.impact.comfort||0), 0, 100);
-  g.social = clamp(g.social + (a.impact.social||0), 0, 100);
-
-  timelineItem("Shop: gekauft", -a.cost, `${a.name} ${a.icon}`, "#1D4ED8");
-
-  // Achievement checks (buy_3)
-  checkAchievements(g);
-
-  toast("Shop", `Gekauft: ${a.name}`);
-  renderAll();
+function checkAchievements(g){
+  if(g.buckets.cash >= 1000) award(g, "ach_cash_1000", "Achievement: Notgroschen", "Du hast 1.000 € Notgroschen erreicht.");
+  if(g.buckets.cash >= 2000) award(g, "ach_cash_2000", "Achievement: Puffer-Profi", "2.000 € Notgroschen – sehr stabil.");
+  if(g.buckets.etf >= 2000) award(g, "ach_etf_2000", "Achievement: Investor", "ETF-Depot über 2.000 €.");
+  if(g.social >= 80) award(g, "ach_social_80", "Achievement: Sozialprofi", "Soziales ≥ 80 – du bleibst verbunden.");
+  if(g.stability >= 80) award(g, "ach_stable_80", "Achievement: Fels", "Stabilität ≥ 80 – stark geplant.");
+  if(g.redMonths >= 3) award(g, "ach_red_3", "Achievement: Überlebt", "3 Minus-Monate überstanden.");
+  if(g.redMonths === 0 && g.month >= 6) award(g, "ach_no_red_6", "Achievement: Clean Run", "6 Monate ohne Minus!");
 }
 
-// ---------- events & decisions (card mode) ----------
-function effectPillsFromDelta({ money=0, stability=0, comfort=0, social=0 }){
-  const pills = [];
-  const moneyCls = money>0 ? "good" : (money<0 ? "bad" : "neu");
-  pills.push({ cls: moneyCls, text: `${money>0?"+":""}${formatEUR(money)}` });
+// ---------- goal conflict cards ----------
+const GOAL_CONFLICTS = [
+  {
+    title:"Zielkonflikt: Freundeskreis",
+    text:"Deine Leute planen einen Abend (Essen + Aktivität). Du bist knapp bei Kasse.",
+    a:{ label:"Dabei sein", meta:"Teurer, aber du bleibst drin.", money:-45, stability:-2, comfort:+1, social:+7 },
+    b:{ label:"Aussetzen", meta:"Günstig, aber du ziehst dich zurück.", money:+10, stability:+2, comfort:0, social:-6 },
+  },
+  {
+    title:"Zielkonflikt: Komfort vs Kosten",
+    text:"Dein Alltag nervt. Du könntest dir etwas kaufen, das vieles einfacher macht.",
+    a:{ label:"Kaufen", meta:"Bequemer Alltag.", money:-80, stability:-2, comfort:+6, social:+1 },
+    b:{ label:"Warten", meta:"Du ziehst durch.", money:+20, stability:+3, comfort:-1, social:0 },
+  },
+  {
+    title:"Zielkonflikt: Beziehung/Familie",
+    text:"Du wirst eingeladen. Kleines Geschenk / Fahrtkosten.",
+    a:{ label:"Hingehen", meta:"Du zeigst Präsenz.", money:-25, stability:-1, comfort:0, social:+6 },
+    b:{ label:"Absagen", meta:"Sparen, aber du wirkst abwesend.", money:+10, stability:+2, comfort:0, social:-5 },
+  },
+  {
+    title:"Zielkonflikt: Gesundheit",
+    text:"Sportkurs/Bewegung oder du lässt es diesen Monat.",
+    a:{ label:"Mitmachen", meta:"Kostet, aber tut gut.", money:-30, stability:+1, comfort:+1, social:+3 },
+    b:{ label:"Lassen", meta:"Spart Geld, aber Energie sinkt.", money:+10, stability:-1, comfort:-1, social:-1 },
+  },
+];
 
-  const mk = (label, v)=>{
-    const cls = v>0 ? "good" : (v<0 ? "bad" : "neu");
-    const sign = v>0 ? "+" : "";
-    return { cls, text: `${label} ${sign}${v}` };
-  };
-  pills.push(mk("Stabil", stability));
-  pills.push(mk("Komfort", comfort));
-  pills.push(mk("Soz.", social));
-  return pills;
+function maybeGoalConflict(g, done){
+  // every 2 months roughly
+  if(g.month % 2 !== 0) return done?.();
+  const c = GOAL_CONFLICTS[Math.floor(Math.random()*GOAL_CONFLICTS.length)];
+  showChoiceModal(c, (opt) => {
+    applyOption(g, opt, "Zielkonflikt");
+    done?.();
+  });
 }
 
+// ---------- events ----------
 function applyOption(g, opt, label){
   g.balance += opt.money;
   g.stability = clamp(g.stability + opt.stability, 0, 100);
   g.comfort = clamp(g.comfort + opt.comfort, 0, 100);
   g.social = clamp(g.social + opt.social, 0, 100);
+
   timelineItem(label, opt.money, `${opt.label}: ${opt.meta}`, "#7C3AED");
 }
 
-function enforceDispoFloorCard(g){
-  if(g.balance >= g.dispoFloor) return null;
+function enforceDispoFloor(g, cb){
+  if(g.balance >= g.dispoFloor) return cb?.();
 
-  // snap to dispo floor
+  // Hard floor: can't go lower than dispoFloor.
   const delta = g.dispoFloor - g.balance;
   g.balance = g.dispoFloor;
-  timelineItem("Kontosperre", -delta, "Du bist unter dem Dispo-Limit. Zahlungen gestoppt.", "#DC2626");
+  timelineItem("Kontosperre", -delta, "Du bist unter dem Dispo-Limit. Zahlungen wurden gestoppt.", "#DC2626");
 
-  return {
-    badge:"Notfall",
-    title:"Kontosperre!",
+  const choice = {
+    title:"Kontosperre",
     text:"Du bist unter dem Dispo-Limit. Du musst handeln.",
-    impacts:[{cls:"bad",text:`Limit ${formatEUR(g.dispoFloor)}`}],
-    choices:[
-      {
-        label:"Eltern um Hilfe bitten (+250 €)",
-        meta:"Einmalige Hilfe. Unangenehm, aber effektiv.",
-        impacts: effectPillsFromDelta({ money:+250, stability:+3, comfort:0, social:-1 }),
-        onPick: ()=>{
-          applyOption(g,{label:"Hilfe",meta:"Einmalige Hilfe.",money:+250,stability:+3,comfort:0,social:-1},"Notfall");
-          checkAchievements(g);
-          renderAll();
-          nextCard();
-        }
-      },
-      {
-        label:"Streng sparen (2 Monate)",
-        meta:"Du kürzt Freizeit/Shopping/Abos. Tut weh, hilft aber.",
-        impacts: effectPillsFromDelta({ money:0, stability:+2, comfort:-2, social:-3 }),
-        onPick: ()=>{
-          applyOption(g,{label:"Sparmodus",meta:"Du kürzt hart.",money:0,stability:+2,comfort:-2,social:-3},"Notfall");
-          g.variable.fun = Math.max(20, Math.round(g.variable.fun * 0.6));
-          g.variable.shop = Math.max(20, Math.round(g.variable.shop * 0.6));
-          g.variable.subs = Math.max(0, Math.round(g.variable.subs * 0.6));
-          checkAchievements(g);
-          renderAll();
-          nextCard();
-        }
-      }
-    ],
-    footer:"Tipp: Entnahme aus Notgroschen / ETF kann auch retten."
+    a:{ label:"Eltern um Hilfe bitten", meta:"Einmalige Hilfe, aber es fühlt sich abhängig an.", money:+250, stability:+3, comfort:0, social:-1 },
+    b:{ label:"Streng sparen", meta:"Du kürzt Freizeit/Shopping/Abos für 2 Monate.", money:+0, stability:+2, comfort:-2, social:-3 },
   };
+
+  showChoiceModal(choice, (opt) => {
+    applyOption(g, opt, "Notfall");
+    if(opt.label.includes("Eltern")){
+      g.askedParentsEver = true;
+      award(g, "parents_help", "Achievement: Hilfe annehmen", "Du hast aktiv Hilfe organisiert.");
+    } else {
+      g.refusedParentsEver = true;
+      // apply a temporary austerity effect
+      g.variable.fun = Math.max(20, Math.round(g.variable.fun * 0.6));
+      g.variable.shop = Math.max(20, Math.round(g.variable.shop * 0.6));
+      g.variable.subs = Math.max(0, Math.round(g.variable.subs * 0.6));
+      award(g, "austerity", "Achievement: Disziplin", "Du hast dich für Sparen statt Hilfe entschieden.");
+    }
+    cb?.();
+  });
 }
 
-// decision pools
-const DECISIONS = [
-  {
-    badge:"Entscheidung",
-    title:"Essen & Trinken",
-    text:"Du merkst: Essen kippt den Monat. Was machst du?",
-    a:{ label:"Meal Prep", meta:"Planen & vorkochen.", money:+70, stability:+6, comfort:-1, social:0 },
-    b:{ label:"To-Go/Lieferung", meta:"Bequem, aber teuer.", money:-70, stability:-2, comfort:+2, social:+1 },
-  },
-  {
-    badge:"Entscheidung",
-    title:"Freizeit",
-    text:"Freunde fragen: Kino heute?",
-    a:{ label:"Mitgehen", meta:"Kostet, aber du bist dabei.", money:-25, stability:-1, comfort:+1, social:+6 },
-    b:{ label:"Absagen", meta:"Sparen, aber Isolation steigt.", money:+10, stability:+2, comfort:0, social:-4 },
-  },
-  {
-    badge:"Entscheidung",
-    title:"Abo-Check",
-    text:"Du merkst: Abos fressen Geld.",
-    a:{ label:"Kündigen", meta:"2 Abos weg.", money:+18, stability:+3, comfort:-2, social:-1 },
-    b:{ label:"Behalten", meta:"Bleibt so.", money:0, stability:-1, comfort:+1, social:0 },
-  },
-];
+function award(g, id, title, text){
+  if(g.achievements.has(id)) return;
+  g.achievements.add(id);
+  toast(title, text);
+}
 
-const GOAL_CONFLICTS = [
-  {
-    badge:"Zielkonflikt",
-    title:"Freundeskreis",
-    text:"Deine Leute planen einen Abend. Du bist knapp bei Kasse.",
-    a:{ label:"Dabei sein", meta:"Teurer, aber du bleibst drin.", money:-45, stability:-2, comfort:+1, social:+7 },
-    b:{ label:"Aussetzen", meta:"Günstig, aber du ziehst dich zurück.", money:+10, stability:+2, comfort:0, social:-6 },
-  },
-  {
-    badge:"Zielkonflikt",
-    title:"Komfort vs Kosten",
-    text:"Du könntest dir etwas kaufen, das vieles einfacher macht.",
-    a:{ label:"Kaufen", meta:"Bequemer Alltag.", money:-80, stability:-2, comfort:+6, social:+1 },
-    b:{ label:"Warten", meta:"Du ziehst durch.", money:+20, stability:+3, comfort:-1, social:0 },
-  },
-];
+// --- specific month 1 specials ---
+function doBABDecision(g, done){
+  g.babChoicePending = false;
 
+  const c = {
+    title:"BAB (Berufsausbildungsbeihilfe)",
+    text:"Du bist in Ausbildung. Prüfst du BAB? (vereinfacht)",
+    a:{ label:"Beantragen", meta:"Du bekommst Unterstützung (wenn berechtigt).", money:0, stability:+2, comfort:+1, social:0 },
+    b:{ label:"Nicht beantragen", meta:"Du regelst es ohne Antrag.", money:0, stability:-1, comfort:0, social:0 },
+  };
+
+  showChoiceModal(c, (opt) => {
+    applyOption(g, opt, "Entscheidung");
+    if(opt.label === "Beantragen"){
+      g.bab.active = true;
+      g.bab.amount = 180;
+      timelineInfo("BAB aktiv", `Du bekommst ${formatEUR(g.bab.amount)}/Monat (vereinfacht).`);
+      award(g, "bab", "Achievement: Förderung", "Du hast eine Förderung genutzt.");
+    } else {
+      g.bab.active = false;
+      g.bab.amount = 0;
+    }
+    done?.();
+  });
+}
+
+function doMoveOutFurnishing(g, done){
+  g.moveOutChoicePending = false;
+  if(g.furnished) return done?.();
+
+  const c = {
+    title:"Einrichtung",
+    text:"Du ziehst nicht mehr bei Eltern. Einrichtung kostet.",
+    a:{ label:"Günstig einrichten", meta:"Second-hand, gebraucht.", money:-250, stability:-1, comfort:+2, social:0 },
+    b:{ label:"Neu kaufen", meta:"Schön, aber teuer.", money:-650, stability:-2, comfort:+6, social:+1 },
+  };
+
+  showChoiceModal(c, (opt) => {
+    applyOption(g, opt, "Startkosten");
+    g.furnished = true;
+    done?.();
+  });
+}
+
+// ---------- random event pool ----------
 const EVENTS = [
   {
-    badge:"Ereignis",
     title:"Handy kaputt",
     text:"Dein Handy fällt runter. Reparatur oder neu?",
-    a:{ label:"Reparieren", meta:"Günstiger.", money:-120, stability:-1, comfort:-1, social:-1 },
-    b:{ label:"Neu kaufen", meta:"Teurer, aber nicer.", money:-420, stability:-2, comfort:+2, social:+2 },
+    choice:{
+      title:"Handy kaputt",
+      text:"Was machst du?",
+      a:{ label:"Reparieren", meta:"Günstiger.", money:-120, stability:-1, comfort:-1, social:-1 },
+      b:{ label:"Neu kaufen", meta:"Teurer, aber nice.", money:-420, stability:-2, comfort:+2, social:+2 },
+    },
     after(g){
-      unlockInsuranceHint(g, "Handy: Versicherung kann helfen – kostet aber monatlich.");
+      unlockInsuranceHint(g, "Handy: Versicherung kann helfen – aber kostet monatlich.");
     }
   },
   {
-    badge:"Ereignis",
     title:"Haftpflicht-Fall",
     text:"Du beschädigst aus Versehen etwas bei jemandem.",
-    a:{ label:"Mit Haftpflicht (wenn aktiv)", meta:"Wenn aktiv, wird’s übernommen.", money:0, stability:+1, comfort:0, social:0 },
-    b:{ label:"Ohne Haftpflicht zahlen", meta:"Du zahlst selbst (wenn Haftpflicht aus).", money:0, stability:-1, comfort:0, social:0 },
     after(g){
       unlockInsuranceHint(g, "Haftpflicht: kann dich vor hohen Einmal-Kosten schützen.");
       if(!g.insurance.haftpflicht){
@@ -939,416 +1091,328 @@ const EVENTS = [
     }
   },
   {
-    badge:"Ereignis",
-    title:"Bonus",
+    title:"Job/Schichtbonus",
     text:"Du bekommst einen kleinen Bonus.",
-    a:{ label:"Nice!", meta:"Du nimmst ihn mit.", money:+120, stability:+2, comfort:+1, social:+1 },
-    b:{ label:"In Notgroschen", meta:"Du packst direkt was weg.", money:+120, stability:+3, comfort:0, social:0 },
-    after(g, pickedLabel){
-      if(pickedLabel === "In Notgroschen"){
-        g.buckets.cash += 80;
-        g.balance -= 80;
-        timelineItem("Bonus → Notgroschen", -80, "Direkt Rücklage erhöht.", "#16A34A");
+    after(g){
+      g.balance += 120;
+      timelineItem("Bonus", +120, "Glück gehabt.", "#16A34A");
+      g.stability = clamp(g.stability + 2, 0, 100);
+    }
+  },
+  {
+    title:"Hausrat-Schaden",
+    text:"Etwas in der Wohnung geht kaputt.",
+    after(g){
+      unlockInsuranceHint(g, "Hausrat: kann bei Schäden an Dingen helfen.");
+      if(!g.insurance.hausrat){
+        g.balance -= 160;
+        timelineItem("Ersatz", -160, "Ohne Hausrat zahlst du selbst.", "#DC2626");
+        g.comfort = clamp(g.comfort - 2, 0, 100);
+      } else {
+        timelineInfo("Hausrat greift", "Ersatz übernommen (vereinfacht).");
+        g.comfort = clamp(g.comfort + 1, 0, 100);
       }
     }
   },
 ];
 
-function maybePick(arr, chance){
-  if(Math.random() > chance) return null;
-  return arr[Math.floor(Math.random()*arr.length)];
+function doRandomEvent(g, done){
+  // 50% chance
+  if(Math.random() > 0.5) return done?.();
+
+  const ev = EVENTS[Math.floor(Math.random()*EVENTS.length)];
+  if(ev.choice){
+    showChoiceModal(ev.choice, (opt) => {
+      applyOption(g, opt, "Ereignis");
+      ev.after?.(g);
+      enforceDispoFloor(g, () => done?.());
+    });
+  } else {
+    showEventModal({ title: ev.title, text: ev.text }, () => {
+      ev.after?.(g);
+      enforceDispoFloor(g, () => done?.());
+    });
+  }
 }
 
-// ETF movement (simple)
-function randn(){
-  let u=0,v=0;
-  while(u===0) u=Math.random();
-  while(v===0) v=Math.random();
-  return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);
-}
-function applyEtfMovement(g){
-  let r = 0.004 + randn() * 0.045;
-  if(Math.random() < 0.10) r += (Math.random()*0.16 - 0.08);
-  r = clamp(r, -0.20, 0.20);
-  const before = g.buckets.etf;
-  const change = Math.round(before * r);
-  g.buckets.etf += change;
-  const pct = Math.round(r*1000)/10;
-  return { change, pct };
+// ---------- quarterly ----------
+function quarterlyCosts(month){
+  if(month % 3 !== 0) return [];
+  return [
+    { label:"GEZ (Quartal)", amount: -55, why:"Viele Haushalte zahlen quartalsweise." },
+    { label:"Periodische Kosten", amount: -120, why:"Kosten, die nicht monatlich kommen." },
+  ];
 }
 
-// ---------- month runner (card mode) ----------
-async function runMonthCardMode(){
+// ---------- loan ----------
+function takeLoan(){
   const g = state.game;
-  if(g.hasRunThisMonth){
-    toast("Monat","Schon gespielt. Nächster Monat.");
+  const loanType = el("loanType").value;
+  const cfg = LOAN_TYPES[loanType] ?? LOAN_TYPES.konsum;
+
+  const amount = Math.max(0, Number(el("loanAmount").value || 0));
+  const months = clamp(Number(el("loanMonths").value || 12), cfg.minMonths, cfg.maxMonths);
+
+  if(amount <= 0){
+    timelineClear();
+    timelineInfo("Kredit", "Trage einen Betrag > 0 ein.");
+    return;
+  }
+  if(g.loan.active){
+    timelineClear();
+    timelineInfo("Kredit", "Prototype: nur 1 Kredit gleichzeitig.");
     return;
   }
 
+  const apr = cfg.apr;
+  const rate = calcMonthlyRate(amount, months, apr);
+
+  g.loan = { active:true, principal:amount, monthsLeft:months, rate, apr, type:loanType };
+  g.balance += amount;
+
   timelineClear();
-  applyPassivePerks(g);
+  timelineItem("Kredit ausgezahlt", +amount, `${cfg.label} • ${apr}% p.a.`, "#EA580C");
+  timelineInfo("Monatsrate", `~${formatEUR(rate)}/Monat für ${months} Monate.`);
+  renderGame();
 
-  // Build card sequence for the month
-  state.cardQueue = [];
-
-  // Card 1: Income
-  pushCard({
-    badge:"Phase 1/5",
-    title:"Einkommen",
-    text:`Du erhältst dein Netto-Einkommen.`,
-    impacts:[{cls:"good",text:`+ ${formatEUR(g.income)}`}],
-    choices:[{
-      label:"Weiter",
-      meta:"Einnahmen werden gebucht.",
-      impacts:[{cls:"good",text:`Kontostand +${formatEUR(g.income)}`}],
-      onPick: ()=>{
-        g.balance += g.income;
-        timelineItem("Einkommen (Netto)", g.income, "Vereinfacht.", "#16A34A");
-        renderAll();
-        // check dispo clamp card if needed (unlikely)
-        const clampCard = enforceDispoFloorCard(g);
-        if(clampCard){ state.cardQueue.unshift(clampCard); }
-        nextCard();
-      }
-    }],
-    footer:"Game-Loop: Einkommen → Kosten → Sparen → Ereignisse → Monatsende"
-  });
-
-  // Card 2: Costs
-  pushCard({
-    badge:"Phase 2/5",
-    title:"Fixkosten & Budgets",
-    text:`Jetzt kommen die monatlichen Kosten. Passive Vorteile (Assets) können Budgets leicht reduzieren.`,
-    impacts:[
-      {cls:"bad", text:`- ${formatEUR(computeFixedSum(g))} (ca.)`}
-    ],
-    choices:[{
-      label:"Kosten zahlen",
-      meta:"Miete, Budgets, Versicherungen, Kreditrate …",
-      impacts:[{cls:"bad",text:"Kosten werden abgezogen"}],
-      onPick: ()=>{
-        // apply passive reductions
-        const foodMinus = g._passive?.foodMinus || 0;
-        const mobMinus = g._passive?.mobilityMinus || 0;
-
-        const v = g.variable;
-        const foodEff = Math.max(0, v.food - foodMinus);
-        const mobEff  = Math.max(0, v.mobility - mobMinus);
-
-        // detailed logging
-        const f = g.fixed;
-
-        // insurance
-        const ins = insuranceSum(g);
-
-        // loan
-        let loanPay = 0;
-        if(g.loan.active){
-          loanPay = Math.round(g.loan.rate);
-          g.loan.monthsLeft -= 1;
-          if(g.loan.monthsLeft <= 0){
-            g.loan.active = false;
-            timelineInfo("Kredit beendet", "Abbezahlt.");
-          }
-        }
-
-        const total =
-          f.rent + f.utilities + f.internet + f.phone + f.family +
-          foodEff + v.fun + v.shop + v.subs + mobEff +
-          ins + loanPay;
-
-        g.balance -= total;
-
-        timelineItem("Kosten (Summe)", -total, "Monatliche Belastung.", "#0F172A");
-        timelineItem("Miete", -f.rent, "Wohnen.", "#0F172A");
-        timelineItem("Nebenkosten", -f.utilities, "Strom/Wasser/Heizung.", "#0F172A");
-        timelineItem("Internet", -f.internet, "Vertrag.", "#0F172A");
-        timelineItem("Handy", -f.phone, "Tarif.", "#0F172A");
-        if(f.family>0) timelineItem("Familie", -f.family, "Mehr Personen = mehr Kosten.", "#0F172A");
-
-        timelineItem("Essen/Trinken", -foodEff, foodMinus>0 ? `Asset-Bonus: -${formatEUR(foodMinus)}` : "Lifestyle.", "#0F172A");
-        timelineItem("Freizeit", -v.fun, "Lifestyle.", "#0F172A");
-        timelineItem("Shopping", -v.shop, "Lifestyle.", "#0F172A");
-        timelineItem("Abos", -v.subs, "Lifestyle.", "#0F172A");
-        timelineItem("Mobilität", -mobEff, mobMinus>0 ? `Asset-Bonus: -${formatEUR(mobMinus)}` : "Lifestyle.", "#0F172A");
-
-        if(ins>0) timelineItem("Versicherungen", -ins, "Laufend.", "#0EA5E9");
-        if(loanPay>0) timelineItem("Kreditrate", -loanPay, "Laufend.", "#EA580C");
-
-        const clampCard = enforceDispoFloorCard(g);
-        renderAll();
-        if(clampCard){ state.cardQueue.unshift(clampCard); }
-        nextCard();
-      }
-    }],
-    footer:"Tipp: Assets können Budgets leicht drücken (z. B. Meal Prep / Fahrrad)."
-  });
-
-  // Card 3: Saving plan
-  pushCard({
-    badge:"Phase 3/5",
-    title:"Sparen & Investieren",
-    text:"Wenn du im Plus bist, wird dein Plan angewendet: Notgroschen + ETF + Unterkonten.",
-    impacts:[{cls:"neu",text:"Auto-Plan"}],
-    choices:[{
-      label:"Plan anwenden",
-      meta:"Wenn nicht genug übrig ist, wird gekürzt. Im Minus: kein Invest.",
-      impacts:[{cls:"neu",text:"Notgroschen/ETF/Unterkonten"}],
-      onPick: ()=>{
-        if(g.balance <= 0){
-          timelineInfo("Sparen", "Im Minus/Null: kein Sparen möglich.");
-          g.stability = clamp(g.stability - 2, 0, 100);
-          renderAll();
-          nextCard();
-          return;
-        }
-
-        const wantSub = g.buckets.subs.reduce((s,b)=>s + (b.plan||0), 0);
-        const want = g.plan.cash + g.plan.etf + wantSub;
-        const can = Math.max(0, g.balance);
-        const factor = want > 0 ? Math.min(1, can / want) : 0;
-
-        const payCash = Math.floor(g.plan.cash * factor);
-        const payEtf  = Math.floor(g.plan.etf  * factor);
-        let paidSubs = 0;
-
-        for(const b of g.buckets.subs){
-          const pay = Math.floor((b.plan||0) * factor);
-          if(pay>0){ b.balance += pay; paidSubs += pay; }
-        }
-
-        const totalPaid = payCash + payEtf + paidSubs;
-        g.balance -= totalPaid;
-
-        if(payCash>0){ g.buckets.cash += payCash; timelineItem("Notgroschen", -payCash, "Rücklage.", "#16A34A"); }
-        if(payEtf>0){ g.buckets.etf  += payEtf;  timelineItem("ETF Kauf", -payEtf, "Invest.", "#0EA5E9"); }
-        if(paidSubs>0){ timelineItem("Unterkonten", -paidSubs, "Ziele.", "#7C3AED"); }
-
-        timelineItem("Sparen/Invest (Summe)", -totalPaid, "Plan angewendet.", "#1D4ED8");
-
-        // small stat feel
-        g.stability = clamp(g.stability + 1, 0, 100);
-        g.comfort = clamp(g.comfort - 1, 0, 100);
-
-        renderAll();
-        checkAchievements(g);
-        nextCard();
-      }
-    }],
-    footer:"Notgroschen ist für Notfälle. ETF ist langfristig – Verkauf kostet Gebühr."
-  });
-
-  // Card 4: Decision (always)
-  const decision = DECISIONS[(g.month-1) % DECISIONS.length];
-  pushChoiceCard(g, decision);
-
-  // Card 5: Goal conflict sometimes
-  const goal = maybePick(GOAL_CONFLICTS, 0.55);
-  if(goal) pushChoiceCard(g, goal);
-
-  // Card 6: Event sometimes
-  const ev = maybePick(EVENTS, 0.50);
-  if(ev) pushEventChoiceCard(g, ev);
-
-  // Card 7: ETF movement
-  pushCard({
-    badge:"Phase 4/5",
-    title:"Marktbewegung",
-    text:"Dein ETF schwankt. Das ist normal.",
-    impacts:[{cls:"neu",text:"ETF bewegt sich"}],
-    choices:[{
-      label:"ETF berechnen",
-      meta:"Monatsrendite wird angewendet.",
-      impacts:[{cls:"neu",text:"Chance/Risiko"}],
-      onPick: ()=>{
-        const mv = applyEtfMovement(g);
-        const cls = mv.change >= 0 ? "good" : "bad";
-        timelineItem("ETF Bewegung", mv.change, `Rendite: ${mv.pct>=0?"+":""}${mv.pct}%`, "#0EA5E9");
-        renderAll();
-        setCard({
-          badge:"Phase 4/5",
-          title:"ETF Ergebnis",
-          text:`ETF-Veränderung diesen Monat: ${mv.change>=0?"+":""}${formatEUR(mv.change)} (${mv.pct>=0?"+":""}${mv.pct}%).`,
-          impacts:[{cls, text:`${mv.change>=0?"+":""}${formatEUR(mv.change)}`}],
-          choices:[{
-            label:"Weiter",
-            meta:"Weiter zum Monatsende.",
-            impacts:[],
-            onPick: ()=> nextCard()
-          }],
-          footer:"Langfristig kann das gut sein – kurzfristig schwankt es."
-        });
-      }
-    }],
-    footer:"Wenn du verkaufst, fällt eine kleine Gebühr an."
-  });
-
-  // Card 8: Month end
-  pushCard({
-    badge:"Phase 5/5",
-    title:"Monatsende",
-    text:"Monat abgeschlossen. Wie lief’s?",
-    impacts:[],
-    choices:[
-      {
-        label:"Nächster Monat →",
-        meta:"Du startest den nächsten Turn.",
-        impacts:[{cls:"neu",text:"Monat +1"}],
-        onPick: ()=>{
-          // month end bookkeeping
-          if(g.balance < 0){
-            g.redMonths += 1;
-            g.social = clamp(g.social - 2, 0, 100);
-            g.comfort = clamp(g.comfort - 1, 0, 100);
-          } else {
-            g.social = clamp(g.social + 1, 0, 100);
-          }
-
-          g.historyBalance.push(g.balance);
-          g.historyEtf.push(g.buckets.etf);
-
-          g.hasRunThisMonth = true;
-          checkAchievements(g);
-          renderAll();
-
-          // advance month
-          if(g.month >= 12){
-            // end summary card
-            state.cardQueue = [];
-            pushCard(makeEndSummaryCard(g));
-            g.hasRunThisMonth = false; // allow “restart flow” if desired
-            nextCard();
-            return;
-          }
-
-          g.month += 1;
-          g.hasRunThisMonth = false;
-
-          // new queue empty -> idle card will show
-          state.cardQueue = [];
-          renderAll();
-          nextCard();
-        }
-      }
-    ],
-    footer:"Tipp: Log hilft beim Nachvollziehen, ist aber optional."
-  });
-
-  renderAll();
-  await nextCard();
+  award(g, "loan_taken", "Achievement: Kredit", "Du hast einen Kredit aufgenommen. Beobachte die Belastung.");
+  enforceDispoFloor(g, () => renderGame());
 }
 
-function pushChoiceCard(g, cfg){
-  pushCard({
-    badge: cfg.badge || "Entscheidung",
-    title: cfg.title,
-    text: cfg.text,
-    impacts: [],
-    choices: [
-      {
-        label: cfg.a.label,
-        meta: cfg.a.meta,
-        impacts: effectPillsFromDelta(cfg.a),
-        onPick: ()=>{
-          applyOption(g, cfg.a, cfg.badge || "Entscheidung");
-          const clampCard = enforceDispoFloorCard(g);
-          renderAll();
-          checkAchievements(g);
-          if(clampCard){ state.cardQueue.unshift(clampCard); }
-          nextCard();
-        }
-      },
-      {
-        label: cfg.b.label,
-        meta: cfg.b.meta,
-        impacts: effectPillsFromDelta(cfg.b),
-        onPick: ()=>{
-          applyOption(g, cfg.b, cfg.badge || "Entscheidung");
-          const clampCard = enforceDispoFloorCard(g);
-          renderAll();
-          checkAchievements(g);
-          if(clampCard){ state.cardQueue.unshift(clampCard); }
-          nextCard();
-        }
-      }
-    ],
-    footer:"Jede Entscheidung hat messbare Effekte."
-  });
-}
+// ---------- month loop ----------
+function runMonth(){
+  const g = state.game;
+  if(!g || g.hasRunThisMonth) return;
 
-function pushEventChoiceCard(g, ev){
-  pushCard({
-    badge: ev.badge || "Ereignis",
-    title: ev.title,
-    text: ev.text,
-    impacts: [],
-    choices: [
-      {
-        label: ev.a.label,
-        meta: ev.a.meta,
-        impacts: effectPillsFromDelta(ev.a),
-        onPick: ()=>{
-          applyOption(g, ev.a, ev.badge || "Ereignis");
-          ev.after?.(g, ev.a.label);
-          const clampCard = enforceDispoFloorCard(g);
-          renderAll();
-          checkAchievements(g);
-          if(clampCard){ state.cardQueue.unshift(clampCard); }
-          nextCard();
-        }
-      },
-      {
-        label: ev.b.label,
-        meta: ev.b.meta,
-        impacts: effectPillsFromDelta(ev.b),
-        onPick: ()=>{
-          applyOption(g, ev.b, ev.badge || "Ereignis");
-          ev.after?.(g, ev.b.label);
-          const clampCard = enforceDispoFloorCard(g);
-          renderAll();
-          checkAchievements(g);
-          if(clampCard){ state.cardQueue.unshift(clampCard); }
-          nextCard();
-        }
-      }
-    ],
-    footer:"Ereignisse schalten auch Versicherungs-Hinweise frei."
-  });
-}
+  const setPhase = (txt)=>{ const e = el("gExplain"); if(e) e.textContent = txt; };
 
-function makeEndSummaryCard(g){
-  const wealth =
-    g.balance + g.buckets.cash + g.buckets.etf + g.buckets.subs.reduce((s,b)=>s+b.balance,0);
-
-  const text =
-    `Du hast 12 Monate gespielt.\n\n` +
-    `Kontostand: ${formatEUR(g.balance)}\n` +
-    `Notgroschen: ${formatEUR(g.buckets.cash)}\n` +
-    `ETF: ${formatEUR(g.buckets.etf)}\n` +
-    `Unterkonten: ${formatEUR(g.buckets.subs.reduce((s,b)=>s+b.balance,0))}\n\n` +
-    `Vermögen (vereinfachte Summe): ${formatEUR(wealth)}\n` +
-    `Minus-Monate: ${g.redMonths}\n` +
-    `Stabilität/Komfort/Soziales: ${g.stability}/${g.comfort}/${g.social}\n` +
-    `Achievements: ${g.achievements.size}`;
-
-  return {
-    badge:"Finish",
-    title:"Auswertung",
-    text,
-    impacts:[
-      {cls:"neu",text:`Vermögen: ${formatEUR(wealth)}`},
-      {cls: g.redMonths>0 ? "bad":"good", text:`Minus-Monate: ${g.redMonths}`}
-    ],
-    choices:[
-      {
-        label:"Nochmal spielen",
-        meta:"Reset und neue Entscheidungen testen.",
-        impacts:[],
-        onPick: ()=> location.reload()
-      }
-    ],
-    footer:"Das ist ein Lern-Spiel: vereinfacht echte Lebensrealitäten."
+  const doSpecialsAsync = async () => {
+    if(g.month === 1 && g.babChoicePending){
+      await new Promise(resolve => doBABDecision(g, resolve));
+    }
+    if(g.month === 1 && g.moveOutChoicePending){
+      await new Promise(resolve => doMoveOutFurnishing(g, resolve));
+    }
   };
+
+  const coreAsync = async () => {
+    timelineClear();
+
+    // PHASE 1: Income
+    setPhase("Phase 1/5: Einkommen");
+    await sleep(200);
+    g.balance += g.income;
+    timelineItem("Einkommen (Netto)", g.income, "Vereinfacht.", "#16A34A");
+
+    // PHASE 2: Costs
+    setPhase("Phase 2/5: Fixkosten & Budgets");
+    await sleep(200);
+
+    const fixedSum = computeFixedSum(g);
+    g.balance -= fixedSum;
+    timelineItem("Kosten (Summe)", -fixedSum, "Fixkosten + Budgets (BAB reduziert).", "#0F172A");
+
+    const f = g.fixed, v = g.variable;
+    timelineItem("Miete", -f.rent, "Wohnen.", "#0F172A");
+    timelineItem("Nebenkosten", -f.utilities, "Strom/Wasser/Heizung.", "#0F172A");
+    timelineItem("Essen/Trinken", -v.food, "Lifestyle.", "#0F172A");
+    timelineItem("Freizeit", -v.fun, "Lifestyle.", "#0F172A");
+    timelineItem("Shopping", -v.shop, "Lifestyle.", "#0F172A");
+    timelineItem("Abos", -v.subs, "Streaming/Apps.", "#0F172A");
+    timelineItem("Mobilität", -v.mobility, g.hasCar ? "Auto-Basis." : "Ticket/Fahrrad.", "#0F172A");
+    timelineItem("Internet", -f.internet, "Vertrag.", "#0F172A");
+    timelineItem("Handy", -f.phone, "Tarif.", "#0F172A");
+    if(f.family>0) timelineItem("Familie", -f.family, "Mehr Personen = mehr Kosten.", "#0F172A");
+    if(g.bab.active) timelineItem("BAB Entlastung", +g.bab.amount, "Vereinfachtes Modell.", "#16A34A");
+
+    // insurance
+    const insSum = insuranceSum(g);
+    if(insSum > 0){
+      g.balance -= insSum;
+      timelineItem("Versicherungen", -insSum, "Laufende Kosten.", "#0EA5E9");
+      g.comfort = clamp(g.comfort + 1, 0, 100);
+    } else {
+      timelineInfo("Versicherungen", "Keine aktiv. Spart Geld – Risiko bleibt bei dir.");
+    }
+
+    // loan
+    if(g.loan.active){
+      const pay = Math.round(g.loan.rate);
+      g.balance -= pay;
+      g.loan.monthsLeft -= 1;
+      timelineItem("Kreditrate", -pay, `Noch ${g.loan.monthsLeft} Monate.`, "#EA580C");
+      if(g.loan.monthsLeft <= 0){
+        g.loan.active = false;
+        timelineInfo("Kredit beendet", "Abbezahlt.");
+        award(g, "loan_done", "Achievement: Schuldenfrei", "Kredit komplett abbezahlt.");
+      }
+    }
+
+    // quarterly
+    for(const c of quarterlyCosts(g.month)){
+      g.balance += c.amount;
+      timelineItem(c.label, c.amount, c.why, "#0F172A");
+    }
+
+    await new Promise(resolve => enforceDispoFloor(g, resolve));
+
+    // PHASE 3: Planning (auto-apply plan)
+    setPhase("Phase 3/5: Sparplan");
+    await sleep(200);
+
+    const wantSub = g.buckets.subs.reduce((s,b)=> s + (b.plan||0), 0);
+    const want = g.plan.cash + g.plan.etf + wantSub;
+
+    const canSpend = Math.max(0, g.balance);
+    const factor = want > 0 ? Math.min(1, canSpend / want) : 0;
+
+    const payCash = Math.floor(g.plan.cash * factor);
+    const payEtf  = Math.floor(g.plan.etf  * factor);
+
+    let paidSubs = 0;
+    for(const b of g.buckets.subs){
+      const pay = Math.floor((b.plan||0) * factor);
+      if(pay > 0){ b.balance += pay; paidSubs += pay; }
+    }
+
+    const totalPlanPaid = payCash + payEtf + paidSubs;
+    if(totalPlanPaid > 0){
+      g.balance -= totalPlanPaid;
+      timelineItem("Sparen/Invest", -totalPlanPaid, "Notgroschen/ETF/Ziele.", "#4F46E5");
+      g.comfort = clamp(g.comfort - 1, 0, 100);
+    } else {
+      timelineInfo("Sparen/Invest", "Nichts übrig.");
+      g.stability = clamp(g.stability - 2, 0, 100);
+    }
+
+    if(payCash > 0){ g.buckets.cash += payCash; timelineItem("Notgroschen", -payCash, "Puffer.", "#16A34A"); }
+    if(payEtf > 0){ g.buckets.etf += payEtf; timelineItem("ETF Kauf", -payEtf, "Anteile.", "#0EA5E9"); }
+
+    // PHASE 4: Event / Decision chain
+    setPhase("Phase 4/5: Ereignis & Entscheidungen");
+    await sleep(200);
+
+    const choice = CHOICES[(g.month - 1) % CHOICES.length];
+    const picked = await showChoiceModalAsync(choice);
+    applyOption(g, picked, "Entscheidung");
+    await new Promise(resolve => enforceDispoFloor(g, resolve));
+
+    // optional shop
+    const shop = shopChoiceForMonth(g);
+    if(shop){
+      const sp = await showChoiceModalAsync(shop);
+      applyOption(g, sp, "Shop");
+      await new Promise(resolve => enforceDispoFloor(g, resolve));
+    }
+
+    // goal conflict
+    await new Promise(resolve => maybeGoalConflict(g, resolve));
+
+    // optional risk
+    const risk = riskChoiceForMonth(g);
+    if(risk){
+      const rp = await showChoiceModalAsync(risk);
+      applyOption(g, rp, "Risiko");
+      if(rp && rp._risk) resolveRisk(g, rp._risk);
+      await new Promise(resolve => enforceDispoFloor(g, resolve));
+    }
+
+    // random event
+    await new Promise(resolve => doRandomEvent(g, resolve));
+
+    // ETF movement
+    const mv = applyEtfMovement(g);
+    timelineItem("ETF Bewegung", mv.change, `Monatsrendite: ${mv.pct >= 0 ? "+" : ""}${mv.pct}%`, "#0EA5E9");
+
+    if(g.balance < 0) {
+      g.redMonths += 1;
+      g.social = clamp(g.social - 2, 0, 100);
+      g.comfort = clamp(g.comfort - 1, 0, 100);
+    }
+    g.social = clamp(g.social + (g.variable.fun >= 120 ? 1 : 0), 0, 100);
+
+    g.historyBalance.push(g.balance);
+    g.historyEtf.push(g.buckets.etf);
+
+    g.hasRunThisMonth = true;
+
+    checkAchievements(g);
+
+    // PHASE 5: End
+    setPhase("Phase 5/5: Monatsende");
+    await sleep(180);
+
+    renderGame();
+
+    if(g.month >= 12){
+      endGame();
+    } else {
+      setPhase("Monat fertig. Klick auf „Nächster Monat“.");
+    }
+  };
+
+  (async ()=>{
+    await doSpecialsAsync();
+    await coreAsync();
+  })();
+}
+
+function nextMonth(){
+  const g = state.game;
+  if(!g.hasRunThisMonth) return;
+  if(g.month >= 12) return;
+
+  g.month += 1;
+  g.hasRunThisMonth = false;
+
+  timelineClear();
+  timelineInfo("Neuer Monat", "Bereit? Monat starten.");
+  renderGame();
+}
+
+// ---------- end game ----------
+function computeWealth(g){
+  return g.balance
+    + g.buckets.cash
+    + g.buckets.etf
+    + g.buckets.subs.reduce((s,b)=>s+b.balance,0);
+}
+
+function classifyProfile(g){
+  const wealth = computeWealth(g);
+  const stable = g.stability;
+  const comfy = g.comfort;
+  const social = g.social;
+  const red = g.redMonths;
+
+  if(stable >= 75 && red <= 1) return { name:"Der Stratege", line:"Du planst solide und fängst Risiken früh ab." };
+  if(comfy >= 75 && wealth < 800) return { name:"Der Genießer", line:"Komfort ist dir wichtig – kostet aber dauerhaft." };
+  if(g.buckets.etf >= 1200 && stable < 60) return { name:"Der Risiko-Spieler", line:"Du investierst stark, aber schwankst spürbar." };
+  if(red >= 4) return { name:"Der Überlebenskünstler", line:"Du kommst durch – aber oft am Limit." };
+  if(social >= 75 && stable < 60) return { name:"Der Connector", line:"Du bist viel unterwegs – Budget braucht Grenzen." };
+  return { name:"Der Balancierer", line:"Du hältst mehrere Ziele gleichzeitig im Blick." };
+}
+
+function endGame(){
+  const g = state.game;
+  const wealth = computeWealth(g);
+  const prof = classifyProfile(g);
+
+  const ach = [...g.achievements].length;
+
+  const html = `
+    <p><strong>Profil:</strong> ${prof.name} – ${prof.line}</p>
+    <p><strong>Kontostand:</strong> ${formatEUR(g.balance)}</p>
+    <p><strong>Notgroschen:</strong> ${formatEUR(g.buckets.cash)} • <strong>ETF:</strong> ${formatEUR(g.buckets.etf)}</p>
+    <p><strong>Unterkonten:</strong> ${formatEUR(g.buckets.subs.reduce((s,b)=>s+b.balance,0))}</p>
+    <p><strong>Vermögen (vereinfachte Summe):</strong> ${formatEUR(wealth)}</p>
+    <p><strong>Minus-Monate:</strong> ${g.redMonths}</p>
+    <p><strong>Stabilität/Komfort/Soziales:</strong> ${g.stability}/${g.comfort}/${g.social}</p>
+    <p><strong>Achievements:</strong> ${ach}</p>
+    <hr/>
+    <p class="muted">Hinweis: Das ist ein Lern-Spiel. Es vereinfacht viele Dinge (Steuern, Verträge, Lebensrealitäten).</p>
+  `;
+  showEndModal(html);
 }
 
 // ---------- interview/profile ----------
@@ -1372,21 +1436,25 @@ function startGame(){
   state.profile = profile;
   state.game = newGame(profile);
 
-  el("storyText").textContent =
-    "Du startest frisch in dein erstes eigenes Budget. 12 Monate. Ziel: Notgroschen ≥ 1.000 €. " +
-    "Im Karten-Modus erlebst du jeden Monat Schritt für Schritt.";
+  // story text (small flavor)
+  const story = [
+    "Du startest frisch in dein erstes eigenes Budget. Klingt easy – bis die ersten Fixkosten kommen.",
+    "Du hast 12 Monate. Ziel: Notgroschen ≥ 1.000 € und möglichst wenige Minus-Monate.",
+    "Tipp: Komfort & Soziales sind echte Werte – nicht nur Euro."
+  ].join(" ");
+  el("storyText").textContent = story;
 
-  setView("game");
+  el("screenInterview").classList.add("hidden");
+  el("screenGame").classList.remove("hidden");
+
   timelineClear();
-  timelineInfo("Start", "Bereit? Starte den Monat im Karten-Modus.");
-  renderAll();
-  state.cardQueue = [];
-  nextCard();
+  timelineInfo("Los geht's", "Klick auf „Monat starten“.");
+  renderGame();
 }
 
 // ---------- glossary ----------
 function showGlossary(){
-  el("glossaryContent").innerHTML = `
+  const html = `
     <div class="gItem">
       <div class="gTitle">Notgroschen</div>
       <div class="gText">Rücklage für Notfälle (Auto, Waschmaschine, Jobverlust).</div>
@@ -1395,58 +1463,22 @@ function showGlossary(){
     <div class="gItem">
       <div class="gTitle">ETF</div>
       <div class="gText">Ein Fonds, der viele Aktien bündelt. Schwankt. Chance & Risiko.</div>
-      <div class="gSmall">Im Spiel: Verkauf kostet Gebühr.</div>
+      <div class="gSmall">Im Spiel: Du kannst verkaufen – mit Gebühr.</div>
     </div>
     <div class="gItem">
       <div class="gTitle">Dispo</div>
       <div class="gText">Kurzfristiger Kreditrahmen am Konto. Zinsen hoch.</div>
-      <div class="gSmall">Im Spiel: Dispo-Limit = -500 €. Darunter Sperre.</div>
+      <div class="gSmall">Im Spiel: Dispo-Limit = -500 €. Darunter sperrt das Konto.</div>
     </div>
   `;
+  el("glossaryContent").innerHTML = html;
   el("glossaryDrawer").classList.remove("hidden");
   el("glossaryDrawer").setAttribute("aria-hidden","false");
 }
+
 function closeGlossary(){
   el("glossaryDrawer").classList.add("hidden");
   el("glossaryDrawer").setAttribute("aria-hidden","true");
-}
-
-// ---------- log toggle ----------
-function toggleLog(){
-  el("logWrap").classList.toggle("hidden");
-}
-
-// ---------- credit ----------
-function takeLoan(){
-  const g = state.game;
-  const loanType = el("loanType").value;
-  const cfg = LOAN_TYPES[loanType] ?? LOAN_TYPES.konsum;
-
-  const amount = Math.max(0, Number(el("loanAmount").value || 0));
-  const months = clamp(Number(el("loanMonths").value || 12), cfg.minMonths, cfg.maxMonths);
-
-  if(amount <= 0){ toast("Kredit","Betrag > 0 eingeben."); return; }
-  if(g.loan.active){ toast("Kredit","Prototype: nur 1 Kredit gleichzeitig."); return; }
-
-  const rate = calcMonthlyRate(amount, months, cfg.apr);
-
-  g.loan = { active:true, principal:amount, monthsLeft:months, rate, apr:cfg.apr, type:loanType };
-  g.balance += amount;
-
-  timelineItem("Kredit ausgezahlt", +amount, `${cfg.label} • ${cfg.apr}% p.a.`, "#EA580C");
-  renderAll();
-  toast("Kredit", "Auszahlung erfolgt.");
-}
-
-// ---------- shop nav ----------
-function openShop(){
-  if(!state.game) return;
-  setView("shop");
-  renderAll();
-}
-function closeShop(){
-  setView("game");
-  renderAll();
 }
 
 // ---------- wire up ----------
@@ -1461,28 +1493,19 @@ function bind(){
   el("reset").addEventListener("click", () => location.reload());
   el("start").addEventListener("click", startGame);
 
-  // game ui
+  // game controls
+  el("btnRunMonth").addEventListener("click", runMonth);
+  el("btnNextMonth").addEventListener("click", nextMonth);
   el("btnApplyPlan").addEventListener("click", applyPlan);
   el("btnAddBucket").addEventListener("click", addBucket);
   el("btnTakeLoan").addEventListener("click", takeLoan);
 
-  // card area actions
-  el("btnShop").addEventListener("click", openShop);
-  el("btnToggleLog").addEventListener("click", toggleLog);
-
-  // shop screen
-  el("btnShopBack").addEventListener("click", closeShop);
-
-  // KPI clicks
+  // KPI withdrawals
   const cash = el("gCash");
   const etf = el("gEtf");
   const bindKpi = (node, fn) => {
-    node.setAttribute("role","button");
-    node.setAttribute("tabindex","0");
     node.addEventListener("click", fn);
-    node.addEventListener("keydown",(e)=>{
-      if(e.key==="Enter"||e.key===" "){ e.preventDefault(); fn(); }
-    });
+    node.addEventListener("keydown", (e)=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); fn(); } });
   };
   bindKpi(cash, withdrawFromCash);
   bindKpi(etf, sellEtf);
@@ -1490,5 +1513,5 @@ function bind(){
   // initial avatar
   regenAvatar();
 }
+
 bind();
-setView("interview");
