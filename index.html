@@ -45,8 +45,8 @@
             <div class="bubble miniBubble">
               <div class="bubbleTitle">Wie funktioniert’s?</div>
               <div class="bubbleText">
-                Du wählst Profil + Lifestyle. Daraus entstehen echte Fixkosten + variable Budgets.
-                Dann spielst du 12 Monate mit Entscheidungen, Ereignissen und Markt-Schwankungen.
+                Du wählst Profil + Lifestyle. Daraus entstehen Fixkosten + Budgets.
+                Dann spielst du 12 Monate mit Entscheidungen, Ereignissen, Komfort- und Sozial-Tradeoffs.
               </div>
             </div>
           </div>
@@ -111,7 +111,7 @@
 
           <div class="sectionTitle">2) Lifestyle (Konsum)</div>
           <p class="small">
-            Das sind variable Kosten. Du kannst hier ehrlich wählen – das Spiel reagiert drauf.
+            Das sind variable Kosten. Komfort & Soziales reagieren darauf (nicht nur dein Kontostand).
           </p>
 
           <div class="formGrid">
@@ -165,14 +165,15 @@
             <div class="ctaLeft">
               <div class="ctaTitle">Ziel (12 Monate)</div>
               <div class="ctaText">
-                <strong>Notgroschen ≥ 1.000 €</strong> & möglichst <strong>keine roten Monate</strong>.
+                <strong>Notgroschen ≥ 1.000 €</strong> & möglichst <strong>wenige rote Monate</strong>.
+                Nebenbei: Komfort & Soziales nicht komplett crashen 😉
               </div>
             </div>
             <button id="start" class="btn primary" type="button">Starten →</button>
           </div>
 
           <div class="microRow">
-            <span class="microPill">💡 Tipp: Wenn’s zu leicht/schwer ist, Lifestyle anpassen und neu starten.</span>
+            <span class="microPill">💡 Tipp: Im Spiel sind nicht nur Geld-Entscheidungen wichtig, sondern auch Komfort & Social.</span>
           </div>
         </div>
       </div>
@@ -206,7 +207,29 @@
           <div class="meter">
             <div class="meterFill" id="gStabilityFill"></div>
           </div>
-          <div class="statTiny">0 = Chaos, 100 = stabil</div>
+          <div class="statTiny">Rücklagen/Schulden/Minus-Monate</div>
+        </div>
+
+        <div class="statCard grow">
+          <div class="statLabelRow">
+            <span class="statLabel">Komfort</span>
+            <span class="statTiny" id="gComfortText">—</span>
+          </div>
+          <div class="meter">
+            <div class="meterFill" id="gComfortFill"></div>
+          </div>
+          <div class="statTiny">Mobilität/Einrichtung/Bequemlichkeit</div>
+        </div>
+
+        <div class="statCard grow">
+          <div class="statLabelRow">
+            <span class="statLabel">Soziales</span>
+            <span class="statTiny" id="gSocialText">—</span>
+          </div>
+          <div class="meter">
+            <div class="meterFill" id="gSocialFill"></div>
+          </div>
+          <div class="statTiny">Kino/Freunde/Isolation</div>
         </div>
       </div>
 
@@ -243,7 +266,7 @@
           </div>
 
           <div class="tinyHelp" id="gExplain">
-            Action: jeden Monat Entscheidung + Ereignis + ETF-Marktbewegung. Unten siehst du Charts.
+            Jeden Monat: Fixkosten/Budgets → Entscheidung → Ereignis → ETF schwankt. Komfort & Soziales reagieren.
           </div>
 
           <div class="timeline" id="gLog"></div>
@@ -260,7 +283,7 @@
             <div class="chartCard">
               <div class="chartHead">
                 <strong>ETF-Verlauf</strong>
-                <span class="chartTiny">Schwankt sichtbar</span>
+                <span class="chartTiny">Volatil</span>
               </div>
               <canvas id="chartEtf" width="600" height="160"></canvas>
             </div>
@@ -288,7 +311,7 @@
               <div class="field">
                 <label>ETF (€/Monat)</label>
                 <input id="inpEtf" type="number" min="0" step="10" value="100" />
-                <div class="hintLine">ETF schwankt. Risiko/Chance sichtbar im Chart.</div>
+                <div class="hintLine">ETF schwankt (Risiko/Chance). Nicht aus dem Minus.</div>
               </div>
 
               <div class="subhead">Unterkonten</div>
@@ -310,7 +333,7 @@
                 <span class="chip">ohne Spoiler</span>
               </div>
               <p class="small">
-                Keine „richtige“ Antwort. Du musst abwägen: laufende Kosten vs. Risiko.
+                Keine „richtige“ Antwort. Infos schalten sich durch Ereignisse frei.
               </p>
               <div id="insuranceList" class="insuranceList"></div>
               <div class="small" id="insuranceUnlockedHint"></div>
@@ -319,11 +342,20 @@
             <div class="cardBox">
               <div class="boxHead">
                 <h3>Kredit</h3>
-                <span class="chip warn">Risiko</span>
+                <span class="chip warn">Zins fest</span>
               </div>
               <p class="small">
-                Kredit = sofort Geld, aber Rate + Zinsen. Nützlich, wenn’s brennt – gefährlich als Lifestyle.
+                Kredit = sofort Geld, aber Rate + Zinsen. Zinsen sind vorgegeben (realistisch).
               </p>
+
+              <div class="field">
+                <label>Kredittyp</label>
+                <select id="loanType">
+                  <option value="konsum">Konsum (6% p.a.)</option>
+                  <option value="auto">Auto (4% p.a.)</option>
+                  <option value="dispo">Dispo (11% p.a.)</option>
+                </select>
+              </div>
 
               <div class="field">
                 <label>Betrag</label>
@@ -332,10 +364,6 @@
               <div class="field">
                 <label>Laufzeit (Monate)</label>
                 <input id="loanMonths" type="number" min="6" step="6" value="12" />
-              </div>
-              <div class="field">
-                <label>Zins (p. a.)</label>
-                <input id="loanApr" type="number" min="0" step="0.5" value="8" />
               </div>
 
               <button class="btn soft ghost" id="btnTakeLoan" type="button">Kredit aufnehmen</button>
@@ -354,7 +382,7 @@
         <div class="modalTitle" id="choiceTitle">Entscheidung</div>
         <div class="modalText" id="choiceText"></div>
         <div class="choiceGrid" id="choiceActions"></div>
-        <div class="modalTiny">Jede Runde hat eine Entscheidung. Keine perfekte Antwort – nur Konsequenzen 🙂</div>
+        <div class="modalTiny">Nicht nur Geld zählt: Stabilität, Komfort und Soziales verändern sich.</div>
       </div>
     </div>
 
