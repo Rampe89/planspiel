@@ -674,6 +674,14 @@ function renderGame(){
   el("gCash").textContent = formatEUR(g.buckets.cash);
   el("gEtf").textContent = formatEUR(g.buckets.etf);
 
+  // make KPIs actionable (withdraw/sell)
+  el("gCash").setAttribute("title","Klicken: Geld aus dem Notgroschen aufs Konto holen");
+  el("gEtf").setAttribute("title","Klicken: ETF-Anteile verkaufen (mit Gebühr)");
+  el("gCash").setAttribute("role","button");
+  el("gEtf").setAttribute("role","button");
+  el("gCash").setAttribute("tabindex","0");
+  el("gEtf").setAttribute("tabindex","0");
+
   el("gStabilityFill").style.width = `${g.stability}%`;
   el("gStabilityText").textContent = `${g.stability}/100`;
 
@@ -709,6 +717,85 @@ function renderGame(){
 
   drawLineChart("chartBalance", g.historyBalance);
   drawLineChart("chartEtf", g.historyEtf);
+}
+
+// ---------- withdrawals (cash buffer / ETF) ----------
+const ETF_SELL_FEE_PCT = 0.01;   // 1% selling fee
+const ETF_SELL_FEE_MIN = 2;      // min fee in €
+
+function promptAmount(title, max, preset="100"){
+  const raw = prompt(`${title} (max. ${Math.round(max)} €)`, preset);
+  if(raw === null) return null;
+  const amount = Math.floor(Number(raw));
+  if(!Number.isFinite(amount) || amount <= 0) return NaN;
+  return amount;
+}
+
+function withdrawFromCash(){
+  const g = state.game;
+  if(!g) return;
+  if(g.buckets.cash <= 0){
+    toast("Notgroschen", "Da ist gerade nichts drin.");
+    return;
+  }
+
+  const amount = promptAmount("Wie viel € willst du aus dem Notgroschen entnehmen?", g.buckets.cash, "100");
+  if(amount === null) return;
+  if(Number.isNaN(amount)){
+    toast("Notgroschen", "Bitte eine Zahl > 0 eingeben.");
+    return;
+  }
+  if(amount > g.buckets.cash){
+    toast("Notgroschen", "Geht nicht: Betrag ist höher als dein Notgroschen.");
+    return;
+  }
+
+  g.buckets.cash -= amount;
+  g.balance += amount;
+
+  timelineClear();
+  timelineItem(
+    "Notgroschen-Entnahme",
+    +amount,
+    `Du nutzt Rücklagen. Neuer Notgroschen-Stand: ${formatEUR(g.buckets.cash)}.`,
+    "#16A34A"
+  );
+  renderGame();
+}
+
+function sellEtf(){
+  const g = state.game;
+  if(!g) return;
+  if(g.buckets.etf <= 0){
+    toast("ETF", "Du hast aktuell kein ETF-Guthaben.");
+    return;
+  }
+
+  const amount = promptAmount("Wie viel € ETF willst du verkaufen?", g.buckets.etf, "200");
+  if(amount === null) return;
+  if(Number.isNaN(amount)){
+    toast("ETF", "Bitte eine Zahl > 0 eingeben.");
+    return;
+  }
+  if(amount > g.buckets.etf){
+    toast("ETF", "Geht nicht: Betrag ist höher als dein ETF-Depot.");
+    return;
+  }
+
+  const fee = Math.max(ETF_SELL_FEE_MIN, Math.round(amount * ETF_SELL_FEE_PCT));
+  const payout = Math.max(0, amount - fee);
+
+  g.buckets.etf -= amount;
+  g.balance += payout;
+
+  timelineClear();
+  timelineItem(
+    "ETF verkauft",
+    +payout,
+    `Verkauf ${formatEUR(amount)} • Gebühr ${formatEUR(fee)} • Auszahlung ${formatEUR(payout)}. Neuer Depot-Stand: ${formatEUR(g.buckets.etf)}.`,
+    "#0EA5E9"
+  );
+  renderGame();
 }
 
 // ---------- plan/buckets ----------
@@ -1374,6 +1461,19 @@ function init(){
   el("btnTakeLoan").addEventListener("click", takeLoan);
   el("btnRunMonth").addEventListener("click", runMonth);
   el("btnNextMonth").addEventListener("click", nextMonth);
+
+  // KPI actions: click/enter/space
+  const hookKpi = (node, fn) => {
+    node.addEventListener("click", fn);
+    node.addEventListener("keydown", (e) => {
+      if(e.key === "Enter" || e.key === " "){
+        e.preventDefault();
+        fn();
+      }
+    });
+  };
+  hookKpi(el("gCash"), withdrawFromCash);
+  hookKpi(el("gEtf"), sellEtf);
 
   refreshInterview();
 }
