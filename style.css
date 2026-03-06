@@ -213,3 +213,81 @@ canvas{ width:100%; height:auto; border-radius:var(--r-lg); background:rgba(248,
 .tip:hover{ background:#fff; }
 ::selection{ background:rgba(37,99,235,.16); }
 @media (prefers-reduced-motion: reduce){ *{ transition:none !important; } }
+/* Tooltip wrapper */
+.tip,
+.tooltipWrap,
+.hasTooltip{
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  overflow: visible;
+}
+
+/* Das kleine ? */
+.tipBtn,
+.tooltipBtn,
+.tooltipIcon{
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,.96);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+  cursor: help;
+  flex: 0 0 auto;
+}
+
+/* Die eigentliche Box */
+.tipBox,
+.tooltipBox,
+.tooltipContent{
+  position: absolute;
+  left: 0;
+  top: calc(100% + 8px);
+  min-width: 220px;
+  max-width: 280px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,.98);
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.5;
+  box-shadow: 0 12px 28px rgba(15,23,42,.18);
+  z-index: 9999;
+
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  transition: opacity .12s ease, transform .12s ease, visibility .12s ease;
+  pointer-events: none;
+}
+
+/* Hover/Fokus zeigt Tooltip */
+.tip:hover .tipBox,
+.tip:focus-within .tipBox,
+.tooltipWrap:hover .tooltipBox,
+.tooltipWrap:focus-within .tooltipBox,
+.hasTooltip:hover .tooltipContent,
+.hasTooltip:focus-within .tooltipContent{
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+/* Wichtig: nicht abschneiden */
+.panel,
+.cardBox,
+.field,
+.receiptCard,
+.statCard,
+.questCard,
+.kpi{
+  overflow: visible;
+}
