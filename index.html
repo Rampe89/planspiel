@@ -23,7 +23,6 @@
       </div>
     </header>
 
-    <!-- SCREEN: INTERVIEW -->
     <section class="screen" id="screenInterview">
       <div class="layout">
         <div class="panel side">
@@ -184,7 +183,6 @@
       </div>
     </section>
 
-    <!-- SCREEN: GAME -->
     <section class="screen hidden" id="screenGame">
       <div class="gameHud">
         <div class="statCard">
@@ -193,7 +191,7 @@
         </div>
 
         <div class="statCard">
-          <div class="statLabel">Kontostand</div>
+          <div class="statLabel">Kontostand <button class="tip" data-tip="Geld auf deinem Hauptkonto. Wenn es unter 0 rutscht, bist du im Minus.">?</button></div>
           <div class="statValue" id="gBalance">0 €</div>
           <div class="statTiny" id="gBalanceHint"></div>
         </div>
@@ -238,6 +236,7 @@
         </div>
       </div>
 
+      <div class="progressDots" id="progressDots"></div>
       <div class="warningStrip" id="warningStrip"></div>
 
       <div class="questRow">
@@ -251,11 +250,11 @@
 
         <div class="kpis">
           <div class="kpi">
-            <div class="kpiLabel">Notgroschen</div>
+            <div class="kpiLabel">Notgroschen <button class="tip" data-tip="Rücklage für Notfälle. Im echten Leben ist das oft die wichtigste erste Reserve.">?</button></div>
             <div class="kpiValue" id="gCash">0 €</div>
           </div>
           <div class="kpi">
-            <div class="kpiLabel">ETF-Depot</div>
+            <div class="kpiLabel">ETF-Depot <button class="tip" data-tip="Langfristiges Investieren. Kann im Wert steigen oder fallen.">?</button></div>
             <div class="kpiValue" id="gEtf">0 €</div>
           </div>
         </div>
@@ -311,7 +310,6 @@
 
         <div class="panel side">
           <div class="stack">
-
             <div class="cardBox avatarGameBox">
               <div class="boxHead">
                 <h3>Dein Avatar</h3>
@@ -320,9 +318,7 @@
               <div class="gameAvatarWrap">
                 <canvas id="gameAvatar" width="16" height="16" aria-label="Spiel Avatar"></canvas>
               </div>
-              <div class="small" id="avatarMoodText">
-                Deine Figur reagiert auf deine Lage im Spiel.
-              </div>
+              <div class="small" id="avatarMoodText">Deine Figur reagiert auf deine Lage im Spiel.</div>
             </div>
 
             <div class="cardBox">
@@ -333,13 +329,13 @@
               <p class="small">Hier planst du, wie viel du jeden Monat zurücklegst.</p>
 
               <div class="field">
-                <label>Notgroschen (€/Monat)</label>
+                <label>Notgroschen (€/Monat) <button class="tip" data-tip="Notgroschen = Geld, das schnell verfügbar ist, wenn etwas Unerwartetes passiert.">?</button></label>
                 <input id="inpCash" type="number" min="0" step="10" value="100" />
                 <div class="hintLine">Geld für Notfälle. Im echten Leben sehr wichtig.</div>
               </div>
 
               <div class="field">
-                <label>ETF (€/Monat)</label>
+                <label>ETF (€/Monat) <button class="tip" data-tip="ETF = Fonds mit vielen Aktien. Gut für langfristigen Aufbau, aber nicht ohne Schwankung.">?</button></label>
                 <input id="inpEtf" type="number" min="0" step="10" value="100" />
                 <div class="hintLine">Langfristiges Investieren. Kann schwanken.</div>
               </div>
@@ -380,7 +376,7 @@
               <p class="small">Ein Kredit hilft sofort, kostet aber später weiter Geld.</p>
 
               <div class="field">
-                <label>Kredittyp</label>
+                <label>Kredittyp <button class="tip" data-tip="Dispo ist oft besonders teuer. Ein Kredit kann helfen, macht künftige Monate aber enger.">?</button></label>
                 <select id="loanType">
                   <option value="konsum">Konsum (6% p.a.)</option>
                   <option value="auto">Auto (4% p.a.)</option>
@@ -408,7 +404,6 @@
       <div class="footerNote" id="goalNote"></div>
     </section>
 
-    <!-- MODAL: CHOICE -->
     <div class="modal hidden" id="choiceModal" role="dialog" aria-modal="true">
       <div class="modalCard modalFocus">
         <div class="modalTitle" id="choiceTitle">Entscheidung</div>
@@ -418,7 +413,6 @@
       </div>
     </div>
 
-    <!-- MODAL: EVENT -->
     <div class="modal hidden" id="eventModal" role="dialog" aria-modal="true">
       <div class="modalCard modalFocus">
         <div class="modalTitle" id="eventTitle">Ereignis</div>
@@ -429,7 +423,6 @@
       </div>
     </div>
 
-    <!-- MODAL: END -->
     <div class="modal hidden" id="endModal" role="dialog" aria-modal="true">
       <div class="modalCard modalFocus">
         <div class="modalTitle" id="endTitle">Auswertung</div>
@@ -440,7 +433,6 @@
       </div>
     </div>
 
-    <!-- DRAWER: GLOSSARY -->
     <div class="drawer hidden" id="glossaryDrawer" aria-hidden="true">
       <div class="drawerCard">
         <div class="drawerHead">
@@ -451,7 +443,6 @@
       </div>
     </div>
 
-    <!-- TOAST -->
     <div class="toast hidden" id="toast">
       <div class="toastTitle" id="toastTitle">Info</div>
       <div class="toastText" id="toastText"></div>
@@ -460,4 +451,4 @@
 
   <script src="game.js"></script>
 </body>
-  </html>
+</html>
