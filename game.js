@@ -18,42 +18,119 @@ function toast(title, text){
   setTimeout(()=> el("toast").classList.add("hidden"), 2400);
 }
 
-// ---------- Avatar ----------
-function drawAvatar(seed){
-  const c = el("avatar");
+// ---------- Avatar system ----------
+const AVATAR_PALETTES = {
+  hair: ["#111827","#1F2937","#3F3F46","#7C2D12","#4B5563"],
+  skin: ["#F2D6C9","#F6E0C6","#DDB7A0","#CFA08A","#EBC7B0"],
+  shirt:["#2563EB","#16A34A","#F97316","#7C3AED","#0EA5E9","#EC4899"],
+  bg:   ["#E2E8F0","#DCFCE7","#E0F2FE","#FEF3C7","#FCE7F3"]
+};
+
+function seededRng(seed){
+  let s = seed || 1337;
+  return () => (s = (s*1664525 + 1013904223) >>> 0) / 4294967296;
+}
+
+function makeAvatarData(seed){
+  const r = seededRng(seed);
+  return {
+    bg: AVATAR_PALETTES.bg[Math.floor(r()*AVATAR_PALETTES.bg.length)],
+    skin: AVATAR_PALETTES.skin[Math.floor(r()*AVATAR_PALETTES.skin.length)],
+    hair: AVATAR_PALETTES.hair[Math.floor(r()*AVATAR_PALETTES.hair.length)],
+    shirt: AVATAR_PALETTES.shirt[Math.floor(r()*AVATAR_PALETTES.shirt.length)],
+    eyeOffset: Math.floor(r()*2),
+    fringe: Math.floor(r()*2),
+  };
+}
+
+function drawAvatarOnCanvas(canvasId, avatarData, mood="neutral"){
+  const c = el(canvasId);
+  if(!c) return;
   const ctx = c.getContext("2d");
   ctx.imageSmoothingEnabled = false;
+  ctx.clearRect(0,0,16,16);
 
-  let s = seed || 1337;
-  const r = () => (s = (s*1664525 + 1013904223) >>> 0) / 4294967296;
-
-  const bg = ["#E2E8F0","#DCFCE7","#E0F2FE","#FEF3C7","#FCE7F3"][Math.floor(r()*5)];
-  ctx.fillStyle = bg;
+  // bg
+  ctx.fillStyle = avatarData.bg;
   ctx.fillRect(0,0,16,16);
 
-  const skin = ["#F2D6C9","#F6E0C6","#DDB7A0","#CFA08A","#EBC7B0"][Math.floor(r()*5)];
-  ctx.fillStyle = skin;
+  // face
+  ctx.fillStyle = avatarData.skin;
   ctx.fillRect(4,4,8,8);
 
-  const hair = ["#111827","#1F2937","#3F3F46","#7C2D12","#4B5563"][Math.floor(r()*5)];
-  ctx.fillStyle = hair;
+  // hair
+  ctx.fillStyle = avatarData.hair;
   ctx.fillRect(4,4,8,3);
+  if(avatarData.fringe) ctx.fillRect(5,6,2,1);
 
+  // eyes
   ctx.fillStyle = "#111827";
-  ctx.fillRect(6,7,1,1);
-  ctx.fillRect(9,7,1,1);
-  ctx.fillRect(7,10,2,1);
+  ctx.fillRect(6,7 + avatarData.eyeOffset,1,1);
+  ctx.fillRect(9,7 + avatarData.eyeOffset,1,1);
 
-  const shirt = ["#2563EB","#16A34A","#F97316","#7C3AED","#0EA5E9"][Math.floor(r()*5)];
-  ctx.fillStyle = shirt;
+  // mouth based on mood
+  if(mood === "happy"){
+    ctx.fillRect(7,10,2,1);
+    ctx.clearRect(7,9,2,1);
+  } else if(mood === "sad"){
+    ctx.fillRect(7,9,2,1);
+    ctx.clearRect(7,10,2,1);
+  } else {
+    ctx.fillRect(7,10,2,1);
+  }
+
+  // shirt
+  ctx.fillStyle = avatarData.shirt;
   ctx.fillRect(4,12,8,4);
   ctx.fillStyle = "rgba(255,255,255,.85)";
   ctx.fillRect(7,13,2,1);
 }
+
 let avatarSalt = 0;
+
 function regenAvatar(){
   avatarSalt++;
-  drawAvatar((Date.now() + avatarSalt) & 0xffffffff);
+  const seed = (Date.now() + avatarSalt) & 0xffffffff;
+  state.avatarSeed = seed;
+  state.avatarData = makeAvatarData(seed);
+  renderAvatarPreview();
+}
+
+function deriveAvatarMood(g){
+  if(!g) return "neutral";
+
+  const score =
+    (g.balance >= 0 ? 1 : -2) +
+    (g.buckets.cash >= 500 ? 1 : -1) +
+    (g.stability >= 65 ? 1 : g.stability <= 35 ? -1 : 0) +
+    (g.social >= 60 ? 1 : g.social <= 30 ? -1 : 0) +
+    (g.comfort >= 60 ? 1 : g.comfort <= 30 ? -1 : 0);
+
+  if(score >= 2) return "happy";
+  if(score <= -2) return "sad";
+  return "neutral";
+}
+
+function renderAvatarPreview(){
+  if(!state.avatarData) return;
+  drawAvatarOnCanvas("avatar", state.avatarData, state.previewMood || "neutral");
+}
+
+function renderGameAvatar(){
+  if(!state.avatarData || !state.game) return;
+  const mood = deriveAvatarMood(state.game);
+  drawAvatarOnCanvas("gameAvatar", state.avatarData, mood);
+
+  el("avatarMoodLabel").textContent =
+    mood === "happy" ? "glücklich" :
+    mood === "sad" ? "traurig" : "neutral";
+
+  el("avatarMoodText").textContent =
+    mood === "happy"
+      ? "Deine Lage ist gerade ziemlich stabil."
+      : mood === "sad"
+      ? "Deine Figur merkt: Es läuft gerade eher schwierig."
+      : "Im Moment ist die Lage gemischt.";
 }
 
 // ---------- Model ----------
@@ -109,7 +186,10 @@ function calcMonthlyRate(amount, months, apr){
 
 const state = {
   profile: null,
-  game: null
+  game: null,
+  avatarSeed: 1337,
+  avatarData: makeAvatarData(1337),
+  previewMood: "neutral"
 };
 
 function initialComfort(p){
@@ -188,6 +268,56 @@ function newGame(profile){
     hasRunThisMonth: false,
     lastReceipt: null
   };
+}
+
+// ---------- Interview live preview ----------
+function readProfile(){
+  return {
+    path: el("path").value,
+    field: el("field").value,
+    living: el("living").value,
+    family: el("family").value,
+    style: el("style").value,
+    lifeFood: el("lifeFood").value,
+    lifeFun: el("lifeFun").value,
+    lifeShop: el("lifeShop").value,
+    lifeSubs: el("lifeSubs").value,
+    lifeMobility: el("lifeMobility").value,
+  };
+}
+
+function updateInterviewPreview(){
+  const p = readProfile();
+
+  const comfort = initialComfort(p);
+  const social = initialSocial(p);
+
+  let mood = "neutral";
+  if(comfort + social >= 130) mood = "happy";
+  if(comfort + social <= 85) mood = "sad";
+
+  state.previewMood = mood;
+  renderAvatarPreview();
+
+  const parts = [];
+
+  if(p.living === "eltern") parts.push("Du wohnst noch bei deinen Eltern. Das spart oft Miete, kann aber auch weniger Freiheit bedeuten.");
+  if(p.living === "wg") parts.push("Du wohnst in einer WG. Das ist oft günstiger als allein wohnen.");
+  if(p.living === "miete") parts.push("Du wohnst zur Miete. Das ist realistischer Alltag für viele junge Erwachsene.");
+  if(p.living === "eigentum") parts.push("Du wohnst im Eigentum. Die Kosten sind anders, aber nicht automatisch niedrig.");
+
+  if(p.lifeMobility === "car") parts.push("Ein Auto macht vieles bequem, kostet aber oft spürbar Geld.");
+  if(p.lifeMobility === "ticket") parts.push("Mit Ticket bist du meist günstiger unterwegs als mit einem Auto.");
+  if(p.lifeMobility === "bike") parts.push("Fahrrad ist günstig, aber nicht immer bequem.");
+
+  if(p.lifeFun === "high") parts.push("Du gibst eher mehr für Freizeit aus. Das kann Spaß bringen, aber drückt aufs Budget.");
+  if(p.lifeFun === "low") parts.push("Du gibst wenig für Freizeit aus. Das spart Geld, kann aber sozial etwas bremsen.");
+
+  if(p.path === "ausbildung") parts.push("In der Ausbildung ist das Einkommen oft deutlich kleiner als später.");
+  if(p.path === "studium") parts.push("Im Studium ist Geld oft knapper. Gute Planung wird wichtig.");
+  if(p.path === "job") parts.push("Im direkten Job kommt meist mehr Geld rein, aber die Ausgaben verschwinden trotzdem nicht.");
+
+  el("storyText").textContent = parts.join(" ");
 }
 
 // ---------- Timeline ----------
@@ -307,7 +437,7 @@ function renderReceipt(g){
 
   el("receiptBody").innerHTML = body;
   el("receiptFoot").textContent =
-    "Das soll zeigen: Erst gehen feste Kosten weg. Was übrig bleibt, ist oft kleiner als man denkt.";
+    "Das zeigt grob, wie ein echter Monat aussehen kann: Erst kommen feste Kosten, dann bleibt der Rest.";
 }
 
 // ---------- Warning lamps ----------
@@ -509,6 +639,7 @@ function renderAll(){
   renderReceipt(g);
   renderWarnings(g);
   renderCharts(g);
+  renderGameAvatar();
 
   el("btnRunMonth").disabled = g.hasRunThisMonth;
   el("btnNextMonth").disabled = !g.hasRunThisMonth;
@@ -794,6 +925,7 @@ function randn(){
   while(v===0) v=Math.random();
   return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);
 }
+
 function applyEtfMovement(g){
   let r = 0.004 + randn() * 0.045;
   if(Math.random() < 0.10) r += (Math.random()*0.16 - 0.08);
@@ -813,11 +945,9 @@ function runMonth(){
   timelineClear();
   timelineInfo(`Monat ${g.month} startet`, "Du siehst jetzt Schritt für Schritt, wo das Geld hingeht.");
 
-  // Income
   g.balance += g.income;
   timelineItem("Einkommen (Netto)", g.income, "Das ist dein Geld für diesen Monat.");
 
-  // Costs
   const f = g.fixed;
   const v = g.variable;
   const ins = insuranceSum(g);
@@ -855,7 +985,6 @@ function runMonth(){
   g.balance -= total;
   timelineItem("Kosten (Summe)", -total, "Das ist alles zusammen für diesen Monat.");
 
-  // receipt data
   g.lastReceipt = {
     income: g.income,
     rent: f.rent,
@@ -875,7 +1004,6 @@ function runMonth(){
     afterPlan: g.balance
   };
 
-  // hard floor
   if(g.balance < g.dispoFloor){
     const diff = g.dispoFloor - g.balance;
     g.balance = g.dispoFloor;
@@ -883,7 +1011,6 @@ function runMonth(){
     toast("Kontosperre", "Du bist unter dem Dispo-Limit.");
   }
 
-  // Plan
   if(g.balance > 0){
     const wantSub = g.buckets.subs.reduce((s,b)=>s + (b.plan||0), 0);
     const want = g.plan.cash + g.plan.etf + wantSub;
@@ -921,7 +1048,6 @@ function runMonth(){
 
   renderAll();
 
-  // monthly decision
   const d = DECISIONS[(g.month - 1) % DECISIONS.length];
   openChoiceModal({
     title: d.title,
@@ -1017,17 +1143,6 @@ Stabilität / Komfort / Soziales: ${g.stability} / ${g.comfort} / ${g.social}`
   renderAll();
 }
 
-// ---------- Helpers for choices ----------
-function impactPills({money=0, stability=0, comfort=0, social=0}){
-  const mk = (cls,text)=>({cls,text});
-  const pills = [];
-  pills.push(mk(money>0?"good":money<0?"bad":"neu", `${money>0?"+":""}${formatEUR(money)}`));
-  pills.push(mk(stability>0?"good":stability<0?"bad":"neu", `Stabil ${stability>0?"+":""}${stability}`));
-  pills.push(mk(comfort>0?"good":comfort<0?"bad":"neu", `Komfort ${comfort>0?"+":""}${comfort}`));
-  pills.push(mk(social>0?"good":social<0?"bad":"neu", `Soz. ${social>0?"+":""}${social}`));
-  return pills;
-}
-
 // ---------- Glossary ----------
 function showGlossary(){
   el("glossaryContent").innerHTML = `
@@ -1062,21 +1177,6 @@ function closeGlossary(){
 }
 
 // ---------- View ----------
-function readProfile(){
-  return {
-    path: el("path").value,
-    field: el("field").value,
-    living: el("living").value,
-    family: el("family").value,
-    style: el("style").value,
-    lifeFood: el("lifeFood").value,
-    lifeFun: el("lifeFun").value,
-    lifeShop: el("lifeShop").value,
-    lifeSubs: el("lifeSubs").value,
-    lifeMobility: el("lifeMobility").value,
-  };
-}
-
 function setView(view){
   el("screenInterview").classList.toggle("hidden", view !== "interview");
   el("screenGame").classList.toggle("hidden", view !== "game");
@@ -1088,9 +1188,6 @@ function startGame(){
   state.profile = profile;
   state.game = newGame(profile);
 
-  el("storyText").textContent =
-    "Du startest mit deinem ersten eigenen Budget. Ziel: 12 Monate schaffen, Rücklagen aufbauen und nicht dauerhaft ins Minus rutschen.";
-
   setView("game");
   timelineClear();
   timelineInfo("Start", "Klick auf „Monat starten“. Dann siehst du alles Schritt für Schritt.");
@@ -1098,6 +1195,18 @@ function startGame(){
 }
 
 // ---------- Wire up ----------
+function bindInterviewLive(){
+  const ids = [
+    "path","field","living","family","style",
+    "lifeFood","lifeFun","lifeShop","lifeSubs","lifeMobility"
+  ];
+
+  ids.forEach(id=>{
+    el(id).addEventListener("change", updateInterviewPreview);
+    el(id).addEventListener("input", updateInterviewPreview);
+  });
+}
+
 function bind(){
   el("btnGlossaryTop").addEventListener("click", showGlossary);
   el("btnCloseGlossary").addEventListener("click", closeGlossary);
@@ -1118,7 +1227,8 @@ function bind(){
 
   el("btnTakeLoan").addEventListener("click", takeLoan);
 
-  regenAvatar();
+  bindInterviewLive();
+  updateInterviewPreview();
 }
 
 bind();
