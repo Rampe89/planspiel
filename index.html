@@ -3,7 +3,6 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="theme-color" content="#f6f7fb" />
   <title>MoneyQuest – Planspiel</title>
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -14,7 +13,6 @@
         <div class="logo">
           <span class="logoDot" aria-hidden="true"></span>
           <span class="logoText">MoneyQuest</span>
-          <span class="logoSub" aria-hidden="true">BETA</span>
         </div>
         <div class="hudChip" id="hudStep">Interview</div>
       </div>
@@ -31,9 +29,7 @@
         <div class="panel side">
           <div class="sideCard">
             <div class="avatarFrame">
-              <div class="avatarWrap" data-scale="12">
-                <canvas id="avatar" width="16" height="16" aria-label="Pixel Avatar"></canvas>
-              </div>
+              <canvas id="avatar" width="16" height="16" aria-label="Pixel Avatar"></canvas>
             </div>
 
             <div class="sideButtons">
@@ -41,23 +37,17 @@
               <button id="reset" class="btn soft ghost" type="button">Profil Reset</button>
             </div>
 
-            <div class="noteCard">
-              <div class="noteHead">
-                <div class="noteTitle">Dein Start</div>
-                <div class="noteTag">Story</div>
-              </div>
-              <div class="noteBody" id="storyText"></div>
+            <div class="bubble">
+              <div class="bubbleTitle">Dein Start</div>
+              <div class="bubbleText" id="storyText"></div>
             </div>
 
-            <div class="noteCard noteMuted">
-              <div class="noteHead">
-                <div class="noteTitle">Kurz erklärt</div>
-                <div class="noteTag">How to</div>
-              </div>
-              <div class="noteBody">
+            <div class="bubble miniBubble">
+              <div class="bubbleTitle">Kurz erklärt</div>
+              <div class="bubbleText">
                 Du baust dir ein Profil. Daraus entstehen Fixkosten und Budgets.
-                Dann spielst du 12 Monate: Entscheidungen, Ereignisse, Zielkonflikte.
-                Wichtig: Nicht nur Geld – auch Komfort & Soziales zählen.
+                Dann spielst du 12 Monate: Entscheidungen, Ereignisse und Monatskosten.
+                Wichtig: Nicht nur Geld – auch Komfort und Soziales zählen.
               </div>
             </div>
           </div>
@@ -78,6 +68,7 @@
                 <option value="studium">Studium</option>
                 <option value="job">Direkt im Job</option>
               </select>
+              <div class="hintLine">Bestimmt grob dein Einkommen.</div>
             </div>
 
             <div class="field">
@@ -89,6 +80,7 @@
                 <option value="buero">Büro</option>
                 <option value="einzelhandel">Einzelhandel</option>
               </select>
+              <div class="hintLine">Berufe zahlen unterschiedlich.</div>
             </div>
 
             <div class="field">
@@ -99,6 +91,7 @@
                 <option value="eltern">Bei Eltern</option>
                 <option value="eigentum">Eigentum</option>
               </select>
+              <div class="hintLine">Wohnen ist oft der größte Kostenblock.</div>
             </div>
 
             <div class="field">
@@ -108,6 +101,7 @@
                 <option value="partner">Partner:in</option>
                 <option value="kind">Kind(er)</option>
               </select>
+              <div class="hintLine">Mehr Personen = meist mehr Kosten.</div>
             </div>
 
             <div class="field">
@@ -117,12 +111,13 @@
                 <option value="masc">Maskulin</option>
                 <option value="fem">Feminin</option>
               </select>
+              <div class="hintLine">Verändert nur die Figur, nicht die Finanzen.</div>
             </div>
           </div>
 
           <div class="sectionTitle">Lifestyle</div>
           <p class="small">
-            Variable Kosten. Komfort & Soziales reagieren darauf (nicht nur dein Kontostand).
+            Hier legst du fest, wie du lebst. Das beeinflusst Kosten, Komfort und Soziales.
           </p>
 
           <div class="formGrid">
@@ -183,7 +178,7 @@
           </div>
 
           <div class="microRow">
-            <span class="microPill">Tipp: Wenn du alles streichst, sinkt Soziales. Wenn du alles kaufst, sinkt Stabilität.</span>
+            <span class="microPill">Im echten Leben gilt oft: Erst Fixkosten, dann Rücklage, dann Extras.</span>
           </div>
         </div>
       </div>
@@ -192,60 +187,62 @@
     <!-- SCREEN: GAME -->
     <section class="screen hidden" id="screenGame">
       <div class="gameHud">
-        <div class="statCard isMonth">
-          <div class="statLabel"><span class="ico" aria-hidden="true">🗓️</span> Monat</div>
+        <div class="statCard">
+          <div class="statLabel">Monat</div>
           <div class="statValue"><span id="gMonth">1</span><span class="muted">/12</span></div>
         </div>
 
-        <div class="statCard isMoney">
-          <div class="statLabel"><span class="ico" aria-hidden="true">💶</span> Kontostand</div>
+        <div class="statCard">
+          <div class="statLabel">Kontostand</div>
           <div class="statValue" id="gBalance">0 €</div>
           <div class="statTiny" id="gBalanceHint"></div>
         </div>
 
-        <div class="statCard isIncome">
-          <div class="statLabel"><span class="ico" aria-hidden="true">📥</span> Netto</div>
+        <div class="statCard">
+          <div class="statLabel">Netto</div>
           <div class="statValue" id="gIncome">0 €</div>
-          <div class="statTiny">Einkommen/Monat</div>
+          <div class="statTiny">Einkommen pro Monat</div>
         </div>
 
-        <div class="statCard grow isStability">
+        <div class="statCard grow">
           <div class="statLabelRow">
-            <span class="statLabel"><span class="ico" aria-hidden="true">🛡️</span> Stabilität</span>
+            <span class="statLabel">Stabilität</span>
             <span class="statTiny" id="gStabilityText">—</span>
           </div>
-          <div class="meter">
+          <div class="meter meterStability">
             <div class="meterFill" id="gStabilityFill"></div>
           </div>
-          <div class="statTiny">Rücklagen/Schulden/Minus-Monate</div>
+          <div class="statTiny">Rücklagen, Schulden, Minus-Monate</div>
         </div>
 
-        <div class="statCard grow isComfort">
+        <div class="statCard grow">
           <div class="statLabelRow">
-            <span class="statLabel"><span class="ico" aria-hidden="true">🛋️</span> Komfort</span>
+            <span class="statLabel">Komfort</span>
             <span class="statTiny" id="gComfortText">—</span>
           </div>
-          <div class="meter">
+          <div class="meter meterComfort">
             <div class="meterFill" id="gComfortFill"></div>
           </div>
-          <div class="statTiny">Mobilität/Einrichtung/Bequemlichkeit</div>
+          <div class="statTiny">Bequemlichkeit im Alltag</div>
         </div>
 
-        <div class="statCard grow isSocial">
+        <div class="statCard grow">
           <div class="statLabelRow">
-            <span class="statLabel"><span class="ico" aria-hidden="true">🤝</span> Soziales</span>
+            <span class="statLabel">Soziales</span>
             <span class="statTiny" id="gSocialText">—</span>
           </div>
-          <div class="meter">
+          <div class="meter meterSocial">
             <div class="meterFill" id="gSocialFill"></div>
           </div>
-          <div class="statTiny">Kino/Freunde/Isolation</div>
+          <div class="statTiny">Freunde, Freizeit, Teilhabe</div>
         </div>
       </div>
 
+      <div class="warningStrip" id="warningStrip"></div>
+
       <div class="questRow">
-        <div class="questCard isQuest">
-          <div class="questTitle"><span class="ico" aria-hidden="true">🎯</span> Quest</div>
+        <div class="questCard">
+          <div class="questTitle">Quest</div>
           <div class="questText" id="gQuestText">—</div>
           <div class="questBar">
             <div class="questFill" id="gQuestFill"></div>
@@ -253,12 +250,12 @@
         </div>
 
         <div class="kpis">
-          <div class="kpi isCash">
-            <div class="kpiLabel"><span class="ico" aria-hidden="true">🧰</span> Notgroschen</div>
+          <div class="kpi">
+            <div class="kpiLabel">Notgroschen</div>
             <div class="kpiValue" id="gCash">0 €</div>
           </div>
-          <div class="kpi isEtf">
-            <div class="kpiLabel"><span class="ico" aria-hidden="true">📈</span> ETF-Depot</div>
+          <div class="kpi">
+            <div class="kpiLabel">ETF-Depot</div>
             <div class="kpiValue" id="gEtf">0 €</div>
           </div>
         </div>
@@ -275,7 +272,20 @@
           </div>
 
           <div class="tinyHelp" id="gExplain">
-            Ablauf: Einkommen → Kosten → Plan → Entscheidung → Zielkonflikt/Events → ETF schwankt.
+            Ablauf: Einkommen → Kosten → Monatsübersicht → Plan → Entscheidung → Event → ETF.
+          </div>
+
+          <div class="receiptCard" id="receiptCard">
+            <div class="receiptHead">
+              <strong>Monatsübersicht</strong>
+              <span class="receiptMonth" id="receiptMonth">Monat 1</span>
+            </div>
+            <div class="receiptBody" id="receiptBody">
+              Noch kein Monat gespielt.
+            </div>
+            <div class="receiptFoot" id="receiptFoot">
+              Erst Monat starten, dann erscheint hier der „Kassenbon“.
+            </div>
           </div>
 
           <div class="timeline" id="gLog"></div>
@@ -306,22 +316,27 @@
                 <h3>Sparplan</h3>
                 <span class="chip">monatlich</span>
               </div>
-              <p class="small">Plan wird nach Fixkosten angewendet. Im Minus wird nicht investiert.</p>
+              <p class="small">Hier planst du, wie viel du jeden Monat zurücklegst.</p>
 
               <div class="field">
                 <label>Notgroschen (€/Monat)</label>
                 <input id="inpCash" type="number" min="0" step="10" value="100" />
-                <div class="hintLine">Sofort verfügbar für Notfälle.</div>
+                <div class="hintLine">Geld für Notfälle. Im echten Leben sehr wichtig.</div>
               </div>
 
               <div class="field">
                 <label>ETF (€/Monat)</label>
                 <input id="inpEtf" type="number" min="0" step="10" value="100" />
-                <div class="hintLine">Risiko/Chance. Kein Invest aus dem Minus.</div>
+                <div class="hintLine">Langfristiges Investieren. Kann schwanken.</div>
+              </div>
+
+              <div class="planQuickRow">
+                <button class="btn soft ghost" id="btnWithdrawCash" type="button">Notgroschen entnehmen</button>
+                <button class="btn soft ghost" id="btnSellEtf" type="button">ETF verkaufen</button>
               </div>
 
               <div class="subhead">Unterkonten</div>
-              <p class="small">Spar-Töpfe für Ziele.</p>
+              <p class="small">Zum Beispiel für Urlaub, Konsole oder Fahrrad.</p>
 
               <div id="bucketList" class="bucketList"></div>
 
@@ -338,7 +353,7 @@
                 <h3>Versicherungen</h3>
                 <span class="chip">Info durch Events</span>
               </div>
-              <p class="small">Keine Spoiler-Bewertung. Hinweise schalten sich im Spiel frei.</p>
+              <p class="small">Die Hinweise sollen kurz zeigen, wofür Versicherungen gedacht sind.</p>
               <div id="insuranceList" class="insuranceList"></div>
               <div class="small" id="insuranceUnlockedHint"></div>
             </div>
@@ -348,7 +363,7 @@
                 <h3>Kredit</h3>
                 <span class="chip warn">Zins fest</span>
               </div>
-              <p class="small">Kredit = sofort Geld, aber Rate + Zinsen. Zinsen sind vorgegeben.</p>
+              <p class="small">Ein Kredit hilft sofort, kostet aber später weiter Geld.</p>
 
               <div class="field">
                 <label>Kredittyp</label>
@@ -357,6 +372,7 @@
                   <option value="auto">Auto (4% p.a.)</option>
                   <option value="dispo">Dispo (11% p.a.)</option>
                 </select>
+                <div class="hintLine">Dispo ist oft besonders teuer.</div>
               </div>
 
               <div class="field">
@@ -380,17 +396,17 @@
 
     <!-- MODAL: CHOICE -->
     <div class="modal hidden" id="choiceModal" role="dialog" aria-modal="true">
-      <div class="modalCard">
+      <div class="modalCard modalFocus">
         <div class="modalTitle" id="choiceTitle">Entscheidung</div>
         <div class="modalText" id="choiceText"></div>
         <div class="choiceGrid" id="choiceActions"></div>
-        <div class="modalTiny">Hinweis: Stabilität, Komfort und Soziales verändern sich messbar.</div>
+        <div class="modalTiny">Im echten Leben haben Entscheidungen oft Folgen für Geld, Alltag und Freunde.</div>
       </div>
     </div>
 
     <!-- MODAL: EVENT -->
     <div class="modal hidden" id="eventModal" role="dialog" aria-modal="true">
-      <div class="modalCard">
+      <div class="modalCard modalFocus">
         <div class="modalTitle" id="eventTitle">Ereignis</div>
         <div class="modalText" id="eventText"></div>
         <div class="modalActions">
@@ -401,7 +417,7 @@
 
     <!-- MODAL: END -->
     <div class="modal hidden" id="endModal" role="dialog" aria-modal="true">
-      <div class="modalCard">
+      <div class="modalCard modalFocus">
         <div class="modalTitle" id="endTitle">Auswertung</div>
         <div class="modalText" id="endBody"></div>
         <div class="modalActions">
