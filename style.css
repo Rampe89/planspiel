@@ -56,7 +56,6 @@ a{ color:inherit; }
   padding: 0 16px 28px;
 }
 
-/* HUD */
 .hud{
   position: sticky;
   top: 0;
@@ -110,7 +109,6 @@ a{ color:inherit; }
 .hudBtn:active{ transform: translateY(0); box-shadow:none; }
 .hudBtn:focus{ outline:none; box-shadow: var(--ring); }
 
-/* Layout */
 .screen{ display:block; }
 
 .layout{
@@ -155,7 +153,6 @@ a{ color:inherit; }
   border-radius:999px;
 }
 
-/* Forms */
 .formGrid{
   margin-top: 12px;
   display:grid;
@@ -187,7 +184,6 @@ a{ color:inherit; }
 }
 .hintLine{ margin-top:6px; font-size:var(--fs-sm); color:var(--muted); }
 
-/* Buttons */
 .btn{
   border: 1px solid var(--line);
   background: rgba(255,255,255,.96);
@@ -210,7 +206,6 @@ a{ color:inherit; }
 .btn.ghost{ background: transparent; }
 .btn:disabled{ opacity:.55; cursor:not-allowed; transform:none; box-shadow:none; }
 
-/* CTA */
 .ctaCard{
   margin-top: 14px;
   border: 1px solid var(--line);
@@ -236,7 +231,6 @@ a{ color:inherit; }
   border-radius: var(--r-md);
 }
 
-/* Side / Avatar */
 .sideCard{ display:flex; flex-direction:column; gap: 12px; }
 .avatarFrame{
   border-radius: var(--r-xl);
@@ -246,12 +240,21 @@ a{ color:inherit; }
   display:flex;
   justify-content:center;
 }
-#avatar{
-  width: 200px; height: 200px;
+#avatar, #gameAvatar{
+  width: 200px;
+  height: 200px;
   image-rendering: pixelated;
   border-radius: var(--r-xl);
   border: 1px solid var(--line);
   background: rgba(248,250,255,.9);
+}
+.gameAvatarWrap{
+  display:flex;
+  justify-content:center;
+  margin-top: 10px;
+}
+.avatarGameBox .chip{
+  text-transform: capitalize;
 }
 .sideButtons{ display:flex; gap: 10px; flex-wrap:wrap; }
 
@@ -265,7 +268,6 @@ a{ color:inherit; }
 .bubbleText{ line-height: 1.6; color: var(--ink); }
 .miniBubble{ background: rgba(248,250,255,.92); }
 
-/* Game HUD */
 .gameHud{
   display:grid;
   grid-template-columns: 140px 220px 170px 1fr 1fr 1fr;
@@ -311,7 +313,6 @@ a{ color:inherit; }
 .meterComfort  .meterFill{ background: linear-gradient(90deg, rgba(37,99,235,.95), rgba(14,165,233,.95)); }
 .meterSocial   .meterFill{ background: linear-gradient(90deg, rgba(124,58,237,.95), rgba(236,72,153,.95)); }
 
-/* Warning strip */
 .warningStrip{
   margin-bottom: 10px;
   display:flex;
@@ -345,7 +346,6 @@ a{ color:inherit; }
   border-color: rgba(220,38,38,.20);
 }
 
-/* Quest */
 .questRow{
   display:flex;
   gap: 10px;
@@ -399,7 +399,6 @@ a{ color:inherit; }
 .kpiLabel{ font-size: var(--fs-sm); color: var(--muted); font-weight: 900; }
 .kpiValue{ font-size: var(--fs-lg); font-weight: 950; margin-top: 4px; }
 
-/* Game layout */
 .gameLayout{ grid-template-columns: 1.25fr .85fr; }
 @media (max-width:980px){ .gameLayout{ grid-template-columns:1fr; } }
 
@@ -423,7 +422,6 @@ a{ color:inherit; }
   line-height: 1.7;
 }
 
-/* Receipt / Kassenbon */
 .receiptCard{
   margin-top: 12px;
   border: 1px dashed rgba(15,23,42,.22);
@@ -470,7 +468,6 @@ a{ color:inherit; }
   line-height: 1.6;
 }
 
-/* Timeline */
 .timeline{
   margin-top: 12px;
   display:flex;
@@ -507,7 +504,6 @@ a{ color:inherit; }
 .tAmt.neg{ color: var(--bad); }
 .tAmt.neu{ color: var(--muted); }
 
-/* Charts */
 .charts{
   margin-top: 12px;
   display:grid;
@@ -538,7 +534,6 @@ canvas{
   border: 1px solid var(--line2);
 }
 
-/* Right stack */
 .stack{ display:flex; flex-direction:column; gap: 12px; }
 
 .cardBox{
@@ -584,7 +579,6 @@ canvas{
   font-size: var(--fs-md);
 }
 
-/* Buckets */
 .bucketList{
   margin-top: 10px;
   display:flex;
@@ -647,7 +641,6 @@ canvas{
   margin-top: 10px;
 }
 
-/* Insurance */
 .insuranceList{
   margin-top: 10px;
   display:flex;
@@ -711,7 +704,6 @@ canvas{
 }
 .insToggle input{ transform: scale(1.08); }
 
-/* Footer note */
 .footerNote{
   margin-top: 14px;
   font-size: var(--fs-sm);
@@ -722,11 +714,10 @@ canvas{
   padding: 10px 12px;
 }
 
-/* Modals */
 .modal{
   position: fixed;
   inset: 0;
-  background: rgba(15,23,42,.45);
+  background: rgba(15,23,42,.52);
   display:flex;
   align-items:center;
   justify-content:center;
@@ -817,7 +808,6 @@ canvas{
 .pill.bad{ background: rgba(220,38,38,.10); color:#7F1D1D; border-color: rgba(220,38,38,.20); }
 .pill.neu{ background: rgba(37,99,235,.10); color:#1D4ED8; border-color: rgba(37,99,235,.18); }
 
-/* Drawer */
 .drawer{
   position: fixed;
   inset: 0;
@@ -859,7 +849,6 @@ canvas{
 .gText{ font-size: var(--fs-md); }
 .gSmall{ font-size: var(--fs-sm); color: var(--muted); margin-top: 2px; }
 
-/* Toast */
 .toast{
   position: fixed;
   right: 16px;
@@ -879,4 +868,4 @@ canvas{
 
 @media (prefers-reduced-motion: reduce){
   *{ transition: none !important; }
-}
+  }
