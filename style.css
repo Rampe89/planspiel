@@ -223,3 +223,188 @@ canvas{ width:100%; height:auto; border-radius:var(--r-lg); background:rgba(248,
 .tip:hover .tipBox, .tip:focus-within .tipBox, .tipBox.is-open{ opacity:1; visibility:visible; transform:translateY(0); pointer-events:auto; }
 ::selection{ background:rgba(37,99,235,.16); }
 @media (prefers-reduced-motion: reduce){ *{ transition:none !important; } }
+
+
+/* ===== MoneyQuest Layout Pass ===== */
+.gameScreen{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 360px;
+  gap:14px;
+  align-items:start;
+}
+
+.gameScreen > .gameHud,
+.gameScreen > .warningStrip,
+.gameScreen > .questRow,
+.gameScreen > .footerNote{
+  grid-column:1 / -1;
+}
+
+.gameScreen > #mqActionCenter{
+  grid-column:2;
+  align-self:start;
+  position:sticky;
+  top:86px;
+  margin:0;
+  z-index:8;
+  border:1px solid var(--line);
+  border-radius:var(--r-xl);
+  background:rgba(255,255,255,.94);
+  box-shadow:var(--sh2);
+}
+
+.gameDashboard{
+  display:contents;
+}
+
+.mainGamePanel{
+  grid-column:1;
+  display:grid;
+  grid-template-columns:minmax(0,1.1fr) minmax(280px,.9fr);
+  grid-template-areas:
+    "head head"
+    "help help"
+    "receipt charts"
+    "timeline timeline";
+  gap:12px;
+  align-items:start;
+}
+
+.mainGamePanel .panelHead{ grid-area:head; }
+.mainGamePanel .tinyHelp{ grid-area:help; margin-top:0; }
+.mainGamePanel .receiptCard{ grid-area:receipt; margin-top:0; height:100%; }
+.mainGamePanel .charts{
+  grid-area:charts;
+  margin-top:0;
+  align-self:start;
+  display:grid;
+  grid-template-columns:1fr;
+  gap:10px;
+}
+.mainGamePanel .timeline{
+  grid-area:timeline;
+  margin-top:0;
+  max-height:440px;
+  overflow:auto;
+  padding-right:4px;
+}
+
+.sideRail{
+  grid-column:2;
+  align-self:start;
+  position:sticky;
+  top:280px;
+  max-height:calc(100vh - 300px);
+  overflow:auto;
+}
+
+.sideRail .stack{
+  gap:10px;
+}
+
+.gameAvatarWrap{
+  min-height:220px;
+  align-items:center;
+}
+
+.avatarGameBox{
+  min-height:340px;
+}
+
+#gameAvatar{
+  width:200px;
+  height:200px;
+}
+
+.mainGamePanel .chartCard canvas{
+  width:100%;
+  height:140px;
+}
+
+.receiptBody{
+  max-height:250px;
+  overflow:auto;
+  padding-right:2px;
+}
+
+.timeline::-webkit-scrollbar,
+.receiptBody::-webkit-scrollbar,
+.sideRail::-webkit-scrollbar{
+  width:10px;
+}
+.timeline::-webkit-scrollbar-thumb,
+.receiptBody::-webkit-scrollbar-thumb,
+.sideRail::-webkit-scrollbar-thumb{
+  background:rgba(15,23,42,.16);
+  border-radius:999px;
+}
+.timeline::-webkit-scrollbar-track,
+.receiptBody::-webkit-scrollbar-track,
+.sideRail::-webkit-scrollbar-track{
+  background:transparent;
+}
+
+#mqActionCenter .mqActionHead{
+  margin-bottom:8px;
+}
+#mqActionCenter .mqActionGrid{
+  grid-template-columns:1fr 1fr;
+}
+#mqActionCenter .mqActionBtn{
+  min-height:78px;
+}
+
+@media (max-width:1180px){
+  .gameScreen{
+    grid-template-columns:1fr;
+  }
+
+  .gameScreen > #mqActionCenter,
+  .mainGamePanel,
+  .sideRail,
+  .gameScreen > .gameHud,
+  .gameScreen > .warningStrip,
+  .gameScreen > .questRow,
+  .gameScreen > .footerNote{
+    grid-column:1;
+  }
+
+  .gameScreen > #mqActionCenter,
+  .sideRail{
+    position:static;
+    max-height:none;
+    overflow:visible;
+  }
+
+  .mainGamePanel{
+    grid-template-columns:1fr;
+    grid-template-areas:
+      "head"
+      "help"
+      "receipt"
+      "charts"
+      "timeline";
+  }
+
+  #mqActionCenter .mqActionGrid{
+    grid-template-columns:1fr 1fr;
+  }
+}
+
+@media (max-width:760px){
+  .gameHud{
+    grid-template-columns:1fr 1fr;
+  }
+
+  .kpis{
+    grid-template-columns:1fr;
+  }
+
+  #mqActionCenter .mqActionGrid{
+    grid-template-columns:1fr;
+  }
+
+  .sideRail{
+    max-height:none;
+  }
+}
