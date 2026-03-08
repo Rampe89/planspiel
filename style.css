@@ -225,186 +225,181 @@ canvas{ width:100%; height:auto; border-radius:var(--r-lg); background:rgba(248,
 @media (prefers-reduced-motion: reduce){ *{ transition:none !important; } }
 
 
-/* ===== MoneyQuest Layout Pass ===== */
-.gameScreen{
+/* ===== STEAM INDIE GAME PASS ===== */
+#screenGame{
+  position:relative;
+  isolation:isolate;
+  padding:18px;
+  border-radius:28px;
+  background:
+    radial-gradient(1000px 420px at 8% 0%, rgba(56,189,248,.18), transparent 55%),
+    radial-gradient(900px 480px at 100% 0%, rgba(168,85,247,.14), transparent 52%),
+    linear-gradient(180deg, rgba(11,19,35,.98), rgba(7,12,24,.98));
+  border:1px solid rgba(148,163,184,.12);
+  box-shadow:0 24px 80px rgba(2,6,23,.28), inset 0 1px 0 rgba(255,255,255,.04);
+}
+#screenGame::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  border-radius:inherit;
+  background:
+    linear-gradient(90deg, rgba(255,255,255,.02) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(255,255,255,.02) 1px, transparent 1px);
+  background-size:28px 28px;
+  opacity:.35;
+  pointer-events:none;
+}
+#screenGame > *{ position:relative; z-index:1; }
+#screenGame .panel{ background:transparent; border:0; box-shadow:none; padding:0; }
+#screenGame .gameHud{ grid-template-columns:130px 200px 160px 1fr 1fr 1fr; gap:12px; }
+#screenGame .statCard,
+#screenGame .questCard,
+#screenGame .kpi,
+#screenGame .receiptCard,
+#screenGame .chartCard,
+#screenGame .cardBox,
+#screenGame .footerNote,
+#screenGame .timelinePanel{
+  background:linear-gradient(180deg, rgba(15,23,42,.84), rgba(9,14,27,.92));
+  color:#E8F0FF;
+  border:1px solid rgba(148,163,184,.16);
+  box-shadow:0 16px 36px rgba(2,6,23,.26), inset 0 1px 0 rgba(255,255,255,.03);
+  backdrop-filter: blur(10px);
+}
+#screenGame .statLabel,
+#screenGame .statTiny,
+#screenGame .questText,
+#screenGame .kpiLabel,
+#screenGame .small,
+#screenGame .hintLine,
+#screenGame .receiptMonth,
+#screenGame .receiptFoot,
+#screenGame .chartTiny,
+#screenGame .tSub,
+#screenGame .tinyHelp,
+#screenGame .muted,
+#screenGame .footerNote,
+#screenGame #insuranceUnlockedHint{ color:#94A3B8; }
+#screenGame .chip,
+#screenGame .badge,
+#screenGame .warnLamp,
+#screenGame .bucketRow,
+#screenGame .insItem,
+#screenGame canvas,
+#screenGame input,
+#screenGame select{
+  background:rgba(15,23,42,.42);
+  color:#E8F0FF;
+  border-color:rgba(148,163,184,.18);
+}
+#screenGame .chip{ background:rgba(15,23,42,.56); color:#D8E7FF; }
+#screenGame .chip.warn{ background:rgba(234,88,12,.16); color:#FDBA74; border-color:rgba(234,88,12,.28); }
+#screenGame .btn.soft,
+#screenGame .btn.soft.ghost,
+#screenGame .hudBtn.ghost{
+  background:rgba(15,23,42,.52);
+  color:#E8F0FF;
+  border-color:rgba(148,163,184,.18);
+}
+#screenGame .btn.soft:hover,
+#screenGame .btn.soft.ghost:hover{ border-color:rgba(96,165,250,.45); }
+#screenGame .btn.primary{
+  box-shadow:0 10px 24px rgba(37,99,235,.28);
+}
+#screenGame .gameLayout{
+  grid-template-columns:minmax(0,1.45fr) minmax(320px,.8fr);
+  gap:18px;
+  align-items:start;
+}
+#screenGame .gamePrimaryPanel{ display:grid; gap:14px; min-width:0; }
+#screenGame .gameRail{ position:sticky; top:84px; align-self:start; }
+#screenGame .stack{ gap:14px; }
+#screenGame .overviewStrip{
   display:grid;
-  grid-template-columns:minmax(0,1fr) 360px;
+  grid-template-columns:minmax(280px,.92fr) minmax(0,1.08fr);
   gap:14px;
   align-items:start;
 }
-
-.gameScreen > .gameHud,
-.gameScreen > .warningStrip,
-.gameScreen > .questRow,
-.gameScreen > .footerNote{
-  grid-column:1 / -1;
-}
-
-.gameScreen > #mqActionCenter{
-  grid-column:2;
-  align-self:start;
-  position:sticky;
-  top:86px;
-  margin:0;
-  z-index:8;
-  border:1px solid var(--line);
-  border-radius:var(--r-xl);
-  background:rgba(255,255,255,.94);
-  box-shadow:var(--sh2);
-}
-
-.gameDashboard{
-  display:contents;
-}
-
-.mainGamePanel{
-  grid-column:1;
-  display:grid;
-  grid-template-columns:minmax(0,1.1fr) minmax(280px,.9fr);
-  grid-template-areas:
-    "head head"
-    "help help"
-    "receipt charts"
-    "timeline timeline";
-  gap:12px;
-  align-items:start;
-}
-
-.mainGamePanel .panelHead{ grid-area:head; }
-.mainGamePanel .tinyHelp{ grid-area:help; margin-top:0; }
-.mainGamePanel .receiptCard{ grid-area:receipt; margin-top:0; height:100%; }
-.mainGamePanel .charts{
-  grid-area:charts;
+#screenGame .receiptCard,
+#screenGame .timelinePanel,
+#screenGame .chartCard,
+#screenGame .cardBox{ border-radius:22px; }
+#screenGame .receiptCard{ margin-top:0; border-style:solid; }
+#screenGame .charts{ margin-top:0; grid-template-columns:1fr 1fr; gap:14px; min-width:0; }
+#screenGame .chartCard{ padding:14px; }
+#screenGame .timelinePanel{ padding:14px; }
+#screenGame .timelinePanelHead{ display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:10px; }
+#screenGame .timeline{
   margin-top:0;
-  align-self:start;
-  display:grid;
-  grid-template-columns:1fr;
-  gap:10px;
-}
-.mainGamePanel .timeline{
-  grid-area:timeline;
-  margin-top:0;
-  max-height:440px;
+  max-height:430px;
   overflow:auto;
   padding-right:4px;
+  scrollbar-width:thin;
+  scrollbar-color:rgba(96,165,250,.5) transparent;
 }
-
-.sideRail{
-  grid-column:2;
-  align-self:start;
-  position:sticky;
-  top:280px;
-  max-height:calc(100vh - 300px);
-  overflow:auto;
+#screenGame .timeline::-webkit-scrollbar{ width:10px; }
+#screenGame .timeline::-webkit-scrollbar-thumb{ background:rgba(96,165,250,.4); border-radius:999px; }
+#screenGame .tItem{
+  background:linear-gradient(180deg, rgba(19,29,52,.88), rgba(11,18,34,.96));
+  border-color:rgba(96,165,250,.14);
 }
-
-.sideRail .stack{
-  gap:10px;
+#screenGame .tDot{ background:#60A5FA; box-shadow:0 0 0 5px rgba(96,165,250,.14), 0 0 18px rgba(56,189,248,.22); }
+#screenGame .actionCenterBox{ border-color:rgba(56,189,248,.18); }
+#screenGame .actionCenterHead{ align-items:center; }
+#screenGame .actionToggle{
+  cursor:pointer;
+  min-width:78px;
+  text-align:center;
+  transition:transform .16s ease, border-color .16s ease;
 }
-
-.gameAvatarWrap{
-  min-height:220px;
-  align-items:center;
-}
-
-.avatarGameBox{
-  min-height:340px;
-}
-
-#gameAvatar{
-  width:200px;
-  height:200px;
-}
-
-.mainGamePanel .chartCard canvas{
+#screenGame .actionToggle:hover{ border-color:rgba(96,165,250,.4); }
+#screenGame .actionCenterBody{ margin-top:12px; }
+#screenGame .actionButtonGrid{ display:grid; gap:10px; grid-template-columns:1fr; }
+#screenGame .actionBtn{
   width:100%;
-  height:140px;
+  border-radius:16px;
+  border:1px solid rgba(96,165,250,.18);
+  background:linear-gradient(180deg, rgba(23,37,65,.92), rgba(15,23,42,.98));
+  color:#E8F0FF;
+  padding:12px 14px;
+  text-align:left;
+  cursor:pointer;
+  transition:transform .16s ease, border-color .16s ease, box-shadow .16s ease;
 }
-
-.receiptBody{
-  max-height:250px;
-  overflow:auto;
-  padding-right:2px;
+#screenGame .actionBtn:hover{ transform:translateY(-1px); border-color:rgba(96,165,250,.42); box-shadow:0 10px 18px rgba(2,6,23,.24); }
+#screenGame .actionBtn:disabled{ opacity:.45; cursor:not-allowed; transform:none; box-shadow:none; }
+#screenGame .actionLabel{ display:block; font-weight:900; }
+#screenGame .actionMeta{ display:block; margin-top:4px; font-size:12px; color:#94A3B8; }
+#screenGame .advisorBox{ border-color:rgba(168,85,247,.18); }
+#screenGame .gameAvatarWrap{ margin-top:14px; }
+#screenGame #gameAvatar{
+  width:240px;
+  height:240px;
+  border-radius:26px;
+  background:radial-gradient(circle at 50% 0%, rgba(255,255,255,.16), rgba(255,255,255,.04));
+  border-color:rgba(148,163,184,.16);
 }
-
-.timeline::-webkit-scrollbar,
-.receiptBody::-webkit-scrollbar,
-.sideRail::-webkit-scrollbar{
-  width:10px;
+#screenGame .warningStrip{ gap:8px; }
+#screenGame .warnLamp{ background:rgba(15,23,42,.55); border-color:rgba(148,163,184,.14); color:#D8E7FF; }
+#screenGame .warnLamp.good{ background:rgba(22,163,74,.14); color:#BBF7D0; }
+#screenGame .warnLamp.warn{ background:rgba(234,88,12,.14); color:#FED7AA; }
+#screenGame .warnLamp.bad{ background:rgba(220,38,38,.14); color:#FECACA; }
+#screenGame .footerNote{ margin-top:18px; }
+#screenGame.is-crisis{ box-shadow:0 24px 80px rgba(2,6,23,.34), 0 0 0 1px rgba(239,68,68,.16), inset 0 0 0 1px rgba(239,68,68,.08); }
+#screenGame.is-crisis .statCard,
+#screenGame.is-crisis .cardBox,
+#screenGame.is-crisis .timelinePanel{ border-color:rgba(239,68,68,.18); }
+@media (max-width: 1100px){
+  #screenGame .gameHud{ grid-template-columns:1fr 1fr 1fr; }
+  #screenGame .gameLayout{ grid-template-columns:1fr; }
+  #screenGame .gameRail{ position:static; }
+  #screenGame .overviewStrip{ grid-template-columns:1fr; }
 }
-.timeline::-webkit-scrollbar-thumb,
-.receiptBody::-webkit-scrollbar-thumb,
-.sideRail::-webkit-scrollbar-thumb{
-  background:rgba(15,23,42,.16);
-  border-radius:999px;
-}
-.timeline::-webkit-scrollbar-track,
-.receiptBody::-webkit-scrollbar-track,
-.sideRail::-webkit-scrollbar-track{
-  background:transparent;
-}
-
-#mqActionCenter .mqActionHead{
-  margin-bottom:8px;
-}
-#mqActionCenter .mqActionGrid{
-  grid-template-columns:1fr 1fr;
-}
-#mqActionCenter .mqActionBtn{
-  min-height:78px;
-}
-
-@media (max-width:1180px){
-  .gameScreen{
-    grid-template-columns:1fr;
-  }
-
-  .gameScreen > #mqActionCenter,
-  .mainGamePanel,
-  .sideRail,
-  .gameScreen > .gameHud,
-  .gameScreen > .warningStrip,
-  .gameScreen > .questRow,
-  .gameScreen > .footerNote{
-    grid-column:1;
-  }
-
-  .gameScreen > #mqActionCenter,
-  .sideRail{
-    position:static;
-    max-height:none;
-    overflow:visible;
-  }
-
-  .mainGamePanel{
-    grid-template-columns:1fr;
-    grid-template-areas:
-      "head"
-      "help"
-      "receipt"
-      "charts"
-      "timeline";
-  }
-
-  #mqActionCenter .mqActionGrid{
-    grid-template-columns:1fr 1fr;
-  }
-}
-
-@media (max-width:760px){
-  .gameHud{
-    grid-template-columns:1fr 1fr;
-  }
-
-  .kpis{
-    grid-template-columns:1fr;
-  }
-
-  #mqActionCenter .mqActionGrid{
-    grid-template-columns:1fr;
-  }
-
-  .sideRail{
-    max-height:none;
-  }
+@media (max-width: 760px){
+  #screenGame{ padding:14px; }
+  #screenGame .gameHud{ grid-template-columns:1fr 1fr; }
+  #screenGame .charts{ grid-template-columns:1fr; }
+  #screenGame #gameAvatar{ width:210px; height:210px; }
+  #screenGame .timeline{ max-height:360px; }
 }

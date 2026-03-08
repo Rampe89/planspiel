@@ -27,7 +27,7 @@
     <!-- SCREEN: INTERVIEW -->
     <section class="screen" id="screenInterview">
       <div class="layout">
-        <div class="panel side">
+        <div class="panel side gameRail">
           <div class="sideCard">
             <div class="avatarFrame">
               <canvas id="avatar" width="16" height="16" aria-label="Pixel Avatar"></canvas>
@@ -54,7 +54,7 @@
           </div>
         </div>
 
-        <div class="panel main">
+        <div class="panel main gamePrimaryPanel">
           <div class="titleBlock">
             <h1>Profil & Lifestyle</h1>
             <p class="sub">Je genauer du hier bist, desto realistischer werden die Monatskosten.</p>
@@ -186,7 +186,7 @@
     </section>
 
     <!-- SCREEN: GAME -->
-    <section class="screen hidden gameScreen" id="screenGame">
+    <section class="screen hidden" id="screenGame">
       <div class="gameHud">
         <div class="statCard">
           <div class="statLabel">Monat</div>
@@ -262,8 +262,8 @@
         </div>
       </div>
 
-      <div class="layout gameLayout gameDashboard">
-        <div class="panel main mainGamePanel">
+      <div class="layout gameLayout">
+        <div class="panel main">
           <div class="panelHead">
             <h2>Monats-Timeline</h2>
             <div class="panelButtons">
@@ -276,41 +276,49 @@
             Ablauf: Einkommen → Kosten → Monatsübersicht → Plan → Entscheidung → Event → ETF.
           </div>
 
-          <div class="receiptCard" id="receiptCard">
-            <div class="receiptHead">
-              <strong>Monatsübersicht</strong>
-              <span class="receiptMonth" id="receiptMonth">Monat 1</span>
+          <div class="overviewStrip">
+            <div class="receiptCard" id="receiptCard">
+              <div class="receiptHead">
+                <strong>Monatsübersicht</strong>
+                <span class="receiptMonth" id="receiptMonth">Monat 1</span>
+              </div>
+              <div class="receiptBody" id="receiptBody">
+                Noch kein Monat gespielt.
+              </div>
+              <div class="receiptFoot" id="receiptFoot">
+                Erst Monat starten, dann erscheint hier der „Kassenbon“.
+              </div>
             </div>
-            <div class="receiptBody" id="receiptBody">
-              Noch kein Monat gespielt.
-            </div>
-            <div class="receiptFoot" id="receiptFoot">
-              Erst Monat starten, dann erscheint hier der „Kassenbon“.
+
+            <div class="charts">
+              <div class="chartCard">
+                <div class="chartHead">
+                  <strong>Kontostand</strong>
+                  <span class="chartTiny">12 Monate</span>
+                </div>
+                <canvas id="chartBalance" width="600" height="160"></canvas>
+              </div>
+
+              <div class="chartCard">
+                <div class="chartHead">
+                  <strong>ETF</strong>
+                  <span class="chartTiny">schwankt</span>
+                </div>
+                <canvas id="chartEtf" width="600" height="160"></canvas>
+              </div>
             </div>
           </div>
 
-          <div class="timeline" id="gLog"></div>
-
-          <div class="charts">
-            <div class="chartCard">
-              <div class="chartHead">
-                <strong>Kontostand</strong>
-                <span class="chartTiny">12 Monate</span>
-              </div>
-              <canvas id="chartBalance" width="600" height="160"></canvas>
+          <div class="timelinePanel">
+            <div class="timelinePanelHead">
+              <strong>Live-Timeline</strong>
+              <span class="chartTiny">neueste Einträge oben</span>
             </div>
-
-            <div class="chartCard">
-              <div class="chartHead">
-                <strong>ETF</strong>
-                <span class="chartTiny">schwankt</span>
-              </div>
-              <canvas id="chartEtf" width="600" height="160"></canvas>
-            </div>
+            <div class="timeline" id="gLog"></div>
           </div>
         </div>
 
-        <div class="panel side sideRail">
+        <div class="panel side">
           <div class="stack">
 
             <div class="cardBox avatarGameBox">
@@ -322,6 +330,25 @@
                 <canvas id="gameAvatar" width="16" height="16" aria-label="Spiel Avatar"></canvas>
               </div>
               <div class="small" id="avatarMoodText">Deine Figur reagiert auf deine Lage im Spiel.</div>
+            </div>
+
+            <div class="cardBox actionCenterBox" id="actionCenter">
+              <div class="boxHead actionCenterHead">
+                <h3>Jederzeit-Aktionen</h3>
+                <button id="actionCenterToggle" class="chip actionToggle" type="button" aria-expanded="false">Öffnen</button>
+              </div>
+              <div class="small actionHint" id="actionCenterHint">Sinnvolle Eingriffe außerhalb von Events.</div>
+              <div id="actionCenterBody" class="actionCenterBody hidden">
+                <div id="actionCenterButtons" class="actionButtonGrid"></div>
+              </div>
+            </div>
+
+            <div class="cardBox advisorBox">
+              <div class="boxHead">
+                <h3>Finanz-Coach</h3>
+                <span class="chip">Live</span>
+              </div>
+              <div class="small" id="advisorText">Gerade keine rote Warnung. Halte den Kurs.</div>
             </div>
 
             <div class="cardBox">

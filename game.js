@@ -531,7 +531,7 @@ function timelineItem(title, amount, sub){
     </div>
     <div class="tAmt ${amount === 0 ? "neu" : amount > 0 ? "pos" : "neg"}">${amount > 0 ? "+" : ""}${formatEUR(amount)}</div>
   `;
-  el("gLog").appendChild(item);
+  el("gLog").prepend(item);
 }
 function timelineInfo(title, sub){ timelineItem(title, 0, sub); }
 
@@ -859,31 +859,41 @@ function takeLoan(){
 // ---------- Action center ----------
 function ensureActionCenter(){
   const root = el("screenGame");
-  if(!root || document.getElementById("actionCenter")) return;
-  const panel = document.createElement("section");
-  panel.id = "actionCenter";
-  panel.style.cssText = "margin:16px 0;padding:14px;border:1px solid rgba(0,0,0,.08);border-radius:18px;background:#fff;box-shadow:0 8px 20px rgba(15,23,42,.06);";
-  panel.innerHTML = `
-    <button id="actionCenterToggle" type="button" style="width:100%;display:flex;justify-content:space-between;align-items:center;background:none;border:0;font:inherit;font-weight:700;padding:0;cursor:pointer;">
-      <span>Jederzeit-Aktionen</span><span id="actionCenterChevron">▾</span>
-    </button>
-    <div id="actionCenterBody" style="margin-top:12px;display:none;">
-      <div id="actionCenterHint" style="font-size:13px;color:#475569;margin-bottom:10px;">Sinnvolle Eingriffe außerhalb von Events.</div>
-      <div id="actionCenterButtons" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;"></div>
-    </div>`;
-  const anchor = el("gLog")?.parentElement || root;
-  anchor.parentNode.insertBefore(panel, anchor);
-  document.getElementById("actionCenterToggle").addEventListener("click", toggleActionPanel);
+  if(!root) return;
+  let panel = document.getElementById("actionCenter");
+  if(!panel){
+    const rail = root.querySelector(".stack") || root;
+    panel = document.createElement("section");
+    panel.id = "actionCenter";
+    panel.className = "cardBox actionCenterBox";
+    panel.innerHTML = `
+      <div class="boxHead actionCenterHead">
+        <h3>Jederzeit-Aktionen</h3>
+        <button id="actionCenterToggle" class="chip actionToggle" type="button" aria-expanded="false">Öffnen</button>
+      </div>
+      <div class="small actionHint" id="actionCenterHint">Sinnvolle Eingriffe außerhalb von Events.</div>
+      <div id="actionCenterBody" class="actionCenterBody hidden">
+        <div id="actionCenterButtons" class="actionButtonGrid"></div>
+      </div>`;
+    rail.insertBefore(panel, rail.firstChild?.nextSibling || null);
+  }
+  const toggle = document.getElementById("actionCenterToggle");
+  if(toggle && !toggle.dataset.bound){
+    toggle.dataset.bound = "1";
+    toggle.addEventListener("click", toggleActionPanel);
+  }
 }
 
 function toggleActionPanel(){
   const body = document.getElementById("actionCenterBody");
-  const chev = document.getElementById("actionCenterChevron");
-  if(!body) return;
-  const open = body.style.display !== "none";
-  body.style.display = open ? "none" : "block";
-  if(chev) chev.textContent = open ? "▾" : "▴";
+  const toggle = document.getElementById("actionCenterToggle");
+  if(!body || !toggle) return;
+  const isHidden = body.classList.contains("hidden");
+  body.classList.toggle("hidden", !isHidden);
+  toggle.setAttribute("aria-expanded", String(isHidden));
+  toggle.textContent = isHidden ? "Schließen" : "Öffnen";
 }
+
 
 function actionUseGuard(limit=2){
   const g = state.game;
@@ -983,19 +993,23 @@ function renderActionCenter(){
   if(!g || !body) return;
   const emergencyDisabled = g.emergencyHelpUsed || !(g.balance < 0 || g.redMonths >= 2);
   const items = [
-    {label:`Abos kündigen (+${formatEUR(Math.min(18, g.variable.subs))})`, fn:"cancelSubscriptions()", disabled:g.variable.subs<=0},
-    {label:`Klamotten verkaufen (+${formatEUR(90)})`, fn:"sellClothes()", disabled:g.soldClothesCooldown>0},
-    {label:`Nebenjob suchen (+${formatEUR(140)}/Monat)`, fn:"startSideJob()", disabled:g.sideJob||g.sideJobUsed},
-    {label:`In WG ziehen`, fn:"moveToWG()", disabled:g.movedToWG || state.profile?.living === "wg"},
-    {label:`Kredit umschulden`, fn:"refinanceLoan()", disabled:!g.loan.active},
-    {label:`Notfallhilfe`, fn:"emergencyHelp()", disabled:emergencyDisabled},
+    {label:"Abos kündigen", meta:`+${formatEUR(Math.min(18, g.variable.subs))} / Monat`, fn:"cancelSubscriptions()", disabled:g.variable.subs<=0},
+    {label:"Klamotten verkaufen", meta:`Einmalig +${formatEUR(90)}`, fn:"sellClothes()", disabled:g.soldClothesCooldown>0},
+    {label:"Nebenjob suchen", meta:`+${formatEUR(140)} pro Monat`, fn:"startSideJob()", disabled:g.sideJob||g.sideJobUsed},
+    {label:"In WG ziehen", meta:"Langfristig geringere Wohnkosten", fn:"moveToWG()", disabled:g.movedToWG || state.profile?.living === "wg"},
+    {label:"Kredit umschulden", meta:"Rate etwas senken", fn:"refinanceLoan()", disabled:!g.loan.active},
+    {label:"Notfallhilfe", meta:"Einmalige Rettung in echter Krise", fn:"emergencyHelp()", disabled:emergencyDisabled},
   ];
   body.innerHTML = items.map(item => `
-    <button type="button" onclick="${item.fn}" ${item.disabled?"disabled":""} style="padding:12px 14px;border-radius:14px;border:1px solid rgba(15,23,42,.12);background:${item.disabled?'#f8fafc':'#fff'};cursor:${item.disabled?'not-allowed':'pointer'};text-align:left;font:inherit;">${item.label}</button>
+    <button type="button" class="actionBtn" onclick="${item.fn}" ${item.disabled?"disabled":""}>
+      <span class="actionLabel">${item.label}</span>
+      <span class="actionMeta">${item.meta}</span>
+    </button>
   `).join("");
   const hint = document.getElementById("actionCenterHint");
   if(hint) hint.textContent = `Monat ${g.month}: ${g.fixedActionsUsedThisMonth}/2 Sofortaktionen genutzt.`;
 }
+
 
 function applyCrisisState(g){
   const root = el("screenGame");
