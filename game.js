@@ -843,20 +843,20 @@ const DECISIONS = [
   {
     title:"Essen & Trinken",
     text:"Du merkst: Essen kippt den Monat. Was machst du?",
-    a:{ label:"Meal Prep", meta:"Planen, vorkochen, Einkaufszettel.", money:+90, stability:+6, comfort:-1, social:0 },
-    b:{ label:"To-Go / Lieferung", meta:"Bequemer, aber deutlich teurer.", money:-85, stability:-2, comfort:+2, social:+1 },
+    a:{ label:"Meal Prep", meta:"Planen und vorkochen.", money:+70, stability:+6, comfort:-1, social:0 },
+    b:{ label:"To-Go / Lieferung", meta:"Bequemer, aber teurer.", money:-70, stability:-2, comfort:+2, social:+1 },
   },
   {
     title:"Freizeit",
     text:"Freunde fragen: Kino heute?",
     a:{ label:"Mitgehen", meta:"Kostet, aber du bist dabei.", money:-25, stability:-1, comfort:+1, social:+6 },
-    b:{ label:"Absagen", meta:"Du sparst, bist aber weniger dabei.", money:+15, stability:+2, comfort:0, social:-4 },
+    b:{ label:"Absagen", meta:"Du sparst, bist aber weniger dabei.", money:+10, stability:+2, comfort:0, social:-4 },
   },
   {
-    title:"Monatscheck",
-    text:"Du schaust auf dein Konto. Wo holst du Luft raus?",
-    a:{ label:"Abend zuhause & günstig", meta:"Ein ruhiger, billiger Monatsteil.", money:+35, stability:+3, comfort:-1, social:-1 },
-    b:{ label:"Ich gönne mir trotzdem was", meta:"Fühlt sich gut an, kostet aber.", money:-35, stability:-1, comfort:+2, social:+1 },
+    title:"Abos prüfen",
+    text:"Du merkst: Abos summieren sich.",
+    a:{ label:"Kündigen", meta:"2 Abos weg.", money:+18, stability:+3, comfort:-2, social:-1 },
+    b:{ label:"Behalten", meta:"Bleibt bequem, kostet aber weiter.", money:0, stability:-1, comfort:+1, social:0 },
   },
 ];
 
@@ -870,8 +870,8 @@ const EVENTS = [
         title:"Handy kaputt",
         text:"Was machst du?",
         options:[
-          { label:"Reparieren", meta:"Billiger, aber nicht perfekt.", impacts:impactPills({money:-scaleCost(g,120), stability:-1, comfort:-1, social:-1}), onPick:()=>{ applyOption(g, {label:"Reparieren", meta:"Billiger.", money:-scaleCost(g,120), stability:-1, comfort:-1, social:-1}, "Ereignis"); finalizeMonth(g); } },
-          { label:"Neu kaufen", meta:"Teurer, aber bequemer.", impacts:impactPills({money:-scaleCost(g,420), stability:-2, comfort:+2, social:+2}), onPick:()=>{ applyOption(g, {label:"Neu kaufen", meta:"Teurer.", money:-scaleCost(g,420), stability:-2, comfort:+2, social:+2}, "Ereignis"); finalizeMonth(g); } }
+          { label:"Reparieren", meta:"Billiger, aber nicht perfekt.", impacts:impactPills({money:-120, stability:-1, comfort:-1, social:-1}), onPick:()=>{ applyOption(g, {label:"Reparieren", meta:"Billiger.", money:-120, stability:-1, comfort:-1, social:-1}, "Ereignis"); finalizeMonth(g); } },
+          { label:"Neu kaufen", meta:"Teurer, aber bequemer.", impacts:impactPills({money:-420, stability:-2, comfort:+2, social:+2}), onPick:()=>{ applyOption(g, {label:"Neu kaufen", meta:"Teurer.", money:-420, stability:-2, comfort:+2, social:+2}, "Ereignis"); finalizeMonth(g); } }
         ]
       });
     }
@@ -884,8 +884,8 @@ const EVENTS = [
         title:"Bonus",
         text:"Was machst du mit dem Extra-Geld?",
         options:[
-          { label:"Einfach behalten", meta:"Mehr Luft auf dem Konto.", impacts:impactPills({money:+140, stability:+2, comfort:+1, social:+1}), onPick:()=>{ applyOption(g, {label:"Behalten", meta:"Mehr Luft.", money:+140, stability:+2, comfort:+1, social:+1}, "Ereignis"); finalizeMonth(g); } },
-          { label:"Teil sparen", meta:"Etwas direkt in den Notgroschen.", impacts:impactPills({money:+140, stability:+3, comfort:0, social:0}), onPick:()=>{ applyOption(g, {label:"Teil sparen", meta:"Du legst direkt was weg.", money:+140, stability:+3, comfort:0, social:0}, "Ereignis"); g.buckets.cash += 100; g.balance -= 100; timelineItem("Bonus → Notgroschen", -100, "Direkt Rücklage erhöht."); finalizeMonth(g); } }
+          { label:"Einfach behalten", meta:"Mehr Luft auf dem Konto.", impacts:impactPills({money:+120, stability:+2, comfort:+1, social:+1}), onPick:()=>{ applyOption(g, {label:"Behalten", meta:"Mehr Luft.", money:+120, stability:+2, comfort:+1, social:+1}, "Ereignis"); finalizeMonth(g); } },
+          { label:"Teil sparen", meta:"Etwas direkt in den Notgroschen.", impacts:impactPills({money:+120, stability:+3, comfort:0, social:0}), onPick:()=>{ applyOption(g, {label:"Teil sparen", meta:"Du legst direkt was weg.", money:+120, stability:+3, comfort:0, social:0}, "Ereignis"); g.buckets.cash += 80; g.balance -= 80; timelineItem("Bonus → Notgroschen", -80, "Direkt Rücklage erhöht."); finalizeMonth(g); } }
         ]
       });
     }
@@ -1035,7 +1035,6 @@ function finalizeMonth(g){
     g.comfort = clamp(g.comfort - 1, 0, 100);
   } else {
     g.social = clamp(g.social + 1, 0, 100);
-    if(g.redMonths > 0) g.redMonths -= 1;
   }
   g.historyBalance.push(g.balance);
   g.historyEtf.push(g.buckets.etf);
