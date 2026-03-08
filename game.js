@@ -19,334 +19,333 @@ function toast(title, text){
 }
 
 // ---------- Avatar ----------
-const AVATAR_PALETTES = {
-  skin: ["#F2D6C9","#F6E0C6","#DDB7A0","#CFA08A","#EBC7B0"],
-  hair: ["#111827","#1F2937","#3F3F46","#7C2D12","#4B5563","#854D0E"],
-  fieldBg: {
-    it: ["#DBEAFE", "#E0F2FE", "#EDE9FE"],
-    pflege: ["#DCFCE7", "#E0F2FE", "#F0FDF4"],
-    handwerk: ["#FEF3C7", "#FDE68A", "#FFEDD5"],
-    buero: ["#F3F4F6", "#E5E7EB", "#E0E7FF"],
-    einzelhandel: ["#FCE7F3", "#FFE4E6", "#FEF3C7"]
-  },
-  fieldShirt: {
-    it: ["#2563EB", "#4F46E5", "#0F766E"],
-    pflege: ["#0EA5E9", "#16A34A", "#14B8A6"],
-    handwerk: ["#EA580C", "#B45309", "#DC2626"],
-    buero: ["#334155", "#1D4ED8", "#6366F1"],
-    einzelhandel: ["#EC4899", "#7C3AED", "#F97316"]
-  },
-  livingAccent: {
-    wg: "#F59E0B",
-    miete: "#64748B",
-    eltern: "#22C55E",
-    eigentum: "#A16207"
-  }
+const FIELD_THEMES = {
+  it:          { bg:"#DBEAFE", ink:"#1D4ED8", soft:"#EFF6FF", accent:"#38BDF8", label:"IT" },
+  pflege:      { bg:"#DCFCE7", ink:"#15803D", soft:"#F0FDF4", accent:"#34D399", label:"Pflege" },
+  handwerk:    { bg:"#FFEDD5", ink:"#C2410C", soft:"#FFF7ED", accent:"#FB923C", label:"Handwerk" },
+  buero:       { bg:"#E2E8F0", ink:"#475569", soft:"#F8FAFC", accent:"#94A3B8", label:"Büro" },
+  einzelhandel:{ bg:"#F3E8FF", ink:"#7E22CE", soft:"#FAF5FF", accent:"#C084FC", label:"Einzelhandel" },
 };
 
-function seededRng(seed){
-  let s = seed || 1337;
-  return () => (s = (s*1664525 + 1013904223) >>> 0) / 4294967296;
-}
+const LIVING_ACCENTS = {
+  wg: "#22C55E",
+  miete: "#2563EB",
+  eltern: "#F59E0B",
+  eigentum: "#8B5CF6",
+};
+
+const PATH_OUTFITS = {
+  ausbildung: "hoodie",
+  studium: "sweater",
+  job: "blazer",
+};
 
 function hashString(str){
-  let h = 2166136261;
-  for(let i = 0; i < str.length; i++){
+  let h = 2166136261 >>> 0;
+  for(let i=0;i<str.length;i++){
     h ^= str.charCodeAt(i);
     h = Math.imul(h, 16777619);
   }
   return h >>> 0;
 }
 
-function chooseBySeed(seed, key, arr){
-  if(!arr || !arr.length) return null;
-  const n = hashString(`${seed}|${key}`);
-  return arr[n % arr.length];
+function seededRng(seed){
+  let s = seed || 1337;
+  return () => (s = (s*1664525 + 1013904223) >>> 0) / 4294967296;
 }
 
-function buildAvatarData(profile, salt = 0){
-  if(!profile){
-    return {
-      bg: "#E5E7EB",
-      shirt: "#2563EB",
-      accent: "#64748B",
-      skin: AVATAR_PALETTES.skin[0],
-      hair: AVATAR_PALETTES.hair[0],
-      hairShape: "short",
-      eyebrow: "flat",
-      outfit: "basic",
-      accessory: "none",
-      detail: "none",
-      fieldLabel: "Alltag"
-    };
-  }
+function choose(arr, rng){
+  return arr[Math.floor(rng() * arr.length)];
+}
 
-  const seed = hashString([
-    profile.path,
-    profile.field,
-    profile.living,
-    profile.family,
-    profile.style,
-    profile.lifeFood,
-    profile.lifeFun,
-    profile.lifeShop,
-    profile.lifeSubs,
-    profile.lifeMobility,
-    salt
-  ].join('|'));
+function getProfileSeed(profile){
+  if(!profile) return 1337 + avatarSalt;
+  return hashString([
+    profile.style, profile.field, profile.path, profile.living, profile.family,
+    profile.lifeFood, profile.lifeFun, profile.lifeShop, profile.lifeSubs, profile.lifeMobility,
+    avatarSalt
+  ].join("|"));
+}
 
-  let hairShape = "mid";
-  let eyebrow = "flat";
-  if(profile.style === "masc"){
-    hairShape = chooseBySeed(seed, "hairShape", ["short", "short", "crop"]);
-    eyebrow = chooseBySeed(seed, "eyebrow", ["flat", "strong"]);
-  } else if(profile.style === "fem"){
-    hairShape = chooseBySeed(seed, "hairShape", ["long", "long", "bob"]);
-    eyebrow = chooseBySeed(seed, "eyebrow", ["soft", "soft", "flat"]);
-  } else {
-    hairShape = chooseBySeed(seed, "hairShape", ["mid", "bob", "crop"]);
-    eyebrow = chooseBySeed(seed, "eyebrow", ["flat", "soft", "strong"]);
-  }
+function buildAvatarFromProfile(profile){
+  const seed = getProfileSeed(profile);
+  const rng = seededRng(seed);
+  const theme = FIELD_THEMES[profile?.field] ?? FIELD_THEMES.it;
+  const styleKey = profile?.style ?? "neutral";
+  const skin = choose(["#F8D7C4","#F0C6AA","#E8BC9D","#DCA98A","#C98D6D"], rng);
 
-  const outfit = chooseBySeed(seed, "outfit", {
-    ausbildung:["hoodie","zip","basic"],
-    studium:["hoodie","basic","stripe"],
-    job:["collar","basic","stripe"]
-  }[profile.path] || ["basic"]);
-
-  const accessory = chooseBySeed(seed, "accessory", {
-    single:["none","none","pin"],
-    partner:["pin","pin","bag"],
-    kind:["bag","pin","bag"]
-  }[profile.family] || ["none"]);
-
-  const detail = chooseBySeed(seed, "detail", {
-    car:["badge","stripe","badge"],
-    ticket:["stripe","none","stripe"],
-    bike:["none","badge","none"]
-  }[profile.lifeMobility] || ["none"]);
+  const hairPools = {
+    masc: ["crop","side","buzz"],
+    fem: ["bob","wave","long"],
+    neutral: ["crop","bob","wave","side"]
+  };
+  const browPools = {
+    masc: "strong",
+    fem: "soft",
+    neutral: rng() > 0.5 ? "soft" : "strong"
+  };
+  const jawPools = {
+    masc: "square",
+    fem: "soft",
+    neutral: rng() > 0.5 ? "soft" : "mid"
+  };
+  const hair = choose(hairPools[styleKey] ?? hairPools.neutral, rng);
+  const hairColor = choose(
+    styleKey === "fem"
+      ? ["#111827","#3F3F46","#6B7280","#7C2D12"]
+      : styleKey === "masc"
+      ? ["#111827","#1F2937","#4B5563","#7C2D12"]
+      : ["#111827","#374151","#6B7280","#7C2D12"],
+    rng
+  );
+  const outfit = PATH_OUTFITS[profile?.path] ?? "hoodie";
+  const accessory = profile?.lifeMobility === "bike" ? "strap" : profile?.lifeMobility === "car" ? "keys" : profile?.lifeMobility === "ticket" ? "card" : "none";
 
   return {
-    bg: chooseBySeed(seed, "bg", AVATAR_PALETTES.fieldBg[profile.field] || ["#E5E7EB"]),
-    shirt: chooseBySeed(seed, "shirt", AVATAR_PALETTES.fieldShirt[profile.field] || ["#2563EB"]),
-    accent: AVATAR_PALETTES.livingAccent[profile.living] || "#64748B",
-    skin: chooseBySeed(seed, "skin", AVATAR_PALETTES.skin),
-    hair: chooseBySeed(seed, "hair", AVATAR_PALETTES.hair),
-    hairShape,
-    eyebrow,
+    seed,
+    theme,
+    skin,
+    hair,
+    hairColor,
+    brow: browPools[styleKey] ?? "soft",
+    jaw: jawPools[styleKey] ?? "mid",
     outfit,
     accessory,
-    detail,
-    fieldLabel: profile.field
+    accent: LIVING_ACCENTS[profile?.living] ?? "#2563EB",
+    family: profile?.family ?? "single",
+    styleKey
   };
-}
-
-function drawAvatarOnCanvas(canvasId, avatarData, mood="neutral"){
-  const c = el(canvasId);
-  if(!c) return;
-  const ctx = c.getContext("2d");
-  ctx.imageSmoothingEnabled = false;
-  ctx.clearRect(0,0,16,16);
-
-  // background: field-driven + housing accent
-  ctx.fillStyle = avatarData.bg;
-  ctx.fillRect(0,0,16,16);
-  ctx.fillStyle = avatarData.accent;
-  ctx.fillRect(0,0,16,2);
-  ctx.globalAlpha = 0.18;
-  ctx.fillRect(0,12,16,4);
-  ctx.globalAlpha = 1;
-
-  // head
-  ctx.fillStyle = avatarData.skin;
-  ctx.fillRect(4,4,8,8);
-
-  // hair, shaped by style choice
-  ctx.fillStyle = avatarData.hair;
-  if(avatarData.hairShape === "short"){
-    ctx.fillRect(4,3,8,3);
-    ctx.fillRect(5,6,2,1);
-  } else if(avatarData.hairShape === "crop"){
-    ctx.fillRect(4,4,8,2);
-    ctx.fillRect(5,3,6,1);
-  } else if(avatarData.hairShape === "long"){
-    ctx.fillRect(4,3,8,3);
-    ctx.fillRect(3,5,1,6);
-    ctx.fillRect(12,5,1,6);
-  } else if(avatarData.hairShape === "bob"){
-    ctx.fillRect(4,3,8,3);
-    ctx.fillRect(3,5,1,4);
-    ctx.fillRect(12,5,1,4);
-  } else {
-    ctx.fillRect(4,3,8,3);
-    ctx.fillRect(3,5,1,3);
-    ctx.fillRect(12,5,1,3);
-  }
-
-  // eyebrows / mood
-  ctx.fillStyle = "#111827";
-  if(mood === "happy"){
-    ctx.fillRect(5,6,2,1);
-    ctx.fillRect(9,6,2,1);
-  } else if(mood === "sad"){
-    ctx.fillRect(5,7,2,1);
-    ctx.fillRect(9,7,2,1);
-  } else if(mood === "stressed"){
-    ctx.fillRect(5,6,2,1);
-    ctx.fillRect(9,7,2,1);
-  } else if(avatarData.eyebrow === "soft"){
-    ctx.fillRect(5,6,2,1);
-    ctx.fillRect(9,6,2,1);
-  } else if(avatarData.eyebrow === "strong"){
-    ctx.fillRect(5,5,2,1);
-    ctx.fillRect(9,5,2,1);
-  } else {
-    ctx.fillRect(5,6,2,1);
-    ctx.fillRect(9,6,2,1);
-  }
-
-  // eyes
-  ctx.fillRect(6,8,1,1);
-  ctx.fillRect(9,8,1,1);
-  if(mood === "stressed") ctx.fillRect(11,6,1,1); // sweat pixel
-  if(mood === "sad") ctx.fillRect(10,9,1,1); // little tear
-
-  // mouth
-  if(mood === "happy"){
-    ctx.fillRect(6,10,4,1);
-    ctx.clearRect(6,9,1,1);
-    ctx.clearRect(9,9,1,1);
-  } else if(mood === "sad"){
-    ctx.fillRect(6,10,4,1);
-    ctx.clearRect(7,10,2,1);
-    ctx.fillRect(7,9,2,1);
-  } else if(mood === "stressed"){
-    ctx.fillRect(6,10,3,1);
-    ctx.fillRect(9,9,1,1);
-  } else {
-    ctx.fillRect(6,10,3,1);
-  }
-
-  // shirt / outfit by path
-  ctx.fillStyle = avatarData.shirt;
-  ctx.fillRect(4,12,8,4);
-  if(avatarData.outfit === "collar"){
-    ctx.fillStyle = "rgba(255,255,255,.9)";
-    ctx.fillRect(7,12,2,1);
-    ctx.fillRect(6,13,1,1);
-    ctx.fillRect(9,13,1,1);
-  } else if(avatarData.outfit === "hoodie"){
-    ctx.fillStyle = "rgba(255,255,255,.28)";
-    ctx.fillRect(5,12,6,1);
-    ctx.fillRect(6,13,1,2);
-    ctx.fillRect(9,13,1,2);
-  } else if(avatarData.outfit === "zip"){
-    ctx.fillStyle = "rgba(255,255,255,.7)";
-    ctx.fillRect(7,12,1,4);
-  } else if(avatarData.outfit === "stripe"){
-    ctx.fillStyle = "rgba(255,255,255,.45)";
-    ctx.fillRect(4,13,8,1);
-  }
-
-  // detail by mobility / family
-  if(avatarData.detail === "badge"){
-    ctx.fillStyle = "#F8FAFC";
-    ctx.fillRect(10,13,1,1);
-  } else if(avatarData.detail === "stripe"){
-    ctx.fillStyle = "rgba(255,255,255,.5)";
-    ctx.fillRect(5,14,6,1);
-  }
-
-  if(avatarData.accessory === "pin"){
-    ctx.fillStyle = avatarData.accent;
-    ctx.fillRect(5,13,1,1);
-  } else if(avatarData.accessory === "bag"){
-    ctx.fillStyle = "#374151";
-    ctx.fillRect(12,12,2,3);
-  }
 }
 
 let avatarSalt = 0;
 const state = {
   profile: null,
   game: null,
-  avatarSeed: 1337,
-  avatarData: buildAvatarData(null, 0),
+  avatarData: buildAvatarFromProfile({
+    style:"neutral", field:"it", path:"ausbildung", living:"wg", family:"single",
+    lifeFood:"normal", lifeFun:"mid", lifeShop:"mid", lifeSubs:"few", lifeMobility:"ticket"
+  }),
   previewMood: "neutral"
 };
 
-function getAvatarProfileSeed(profile){
-  if(!profile) return 1337;
-  const key = [
-    profile.path,
-    profile.field,
-    profile.living,
-    profile.family,
-    profile.style,
-    profile.lifeFood,
-    profile.lifeFun,
-    profile.lifeShop,
-    profile.lifeSubs,
-    profile.lifeMobility,
-    avatarSalt
-  ].join("|");
-  return hashString(key);
-}
-
-function syncAvatarFromProfile(profile){
-  const seed = getAvatarProfileSeed(profile);
-  state.avatarSeed = seed;
-  state.avatarData = buildAvatarData(profile, avatarSalt);
-}
-
 function regenAvatar(){
   avatarSalt++;
-  const profile = readProfile();
-  syncAvatarFromProfile(profile);
+  const profile = state.profile || readProfile();
+  state.avatarData = buildAvatarFromProfile(profile);
   renderAvatarPreview();
+  if(state.game) renderGameAvatar();
 }
 
 function deriveAvatarMood(g){
   if(!g) return "neutral";
-  if(g.balance <= g.dispoFloor || g.redMonths >= 3 || (g.balance < 0 && g.stability <= 30)) return "stressed";
-
-  const positive = [
-    g.balance >= 0,
-    g.buckets.cash >= 500,
-    g.stability >= 60,
-    g.social >= 60,
-    g.comfort >= 60
-  ].filter(Boolean).length;
-
-  const negative = [
-    g.balance < 0,
-    g.buckets.cash < 150,
-    g.stability <= 40,
-    g.social <= 35,
-    g.comfort <= 35
-  ].filter(Boolean).length;
-
-  if(positive >= 4) return "happy";
-  if(negative >= 3) return "sad";
+  if(g.balance <= g.dispoFloor || g.redMonths >= 3) return "stressed";
+  const score =
+    (g.balance >= 0 ? 1 : -2) +
+    (g.buckets.cash >= 500 ? 1 : -1) +
+    (g.stability >= 65 ? 1 : g.stability <= 35 ? -1 : 0) +
+    (g.social >= 60 ? 1 : g.social <= 30 ? -1 : 0) +
+    (g.comfort >= 60 ? 1 : g.comfort <= 30 ? -1 : 0);
+  if(score >= 2) return "happy";
+  if(score <= -2) return "sad";
   return "neutral";
+}
+
+function drawRoundedRect(ctx, x, y, w, h, r, fill){
+  ctx.fillStyle = fill;
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);
+  ctx.arcTo(x,y,x+w,y,r);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function drawAvatarOnCanvas(canvasId, avatarData, mood="neutral"){
+  const c = el(canvasId);
+  if(!c) return;
+  if(c.width !== 160){ c.width = 160; c.height = 160; }
+  const ctx = c.getContext("2d");
+  ctx.clearRect(0,0,c.width,c.height);
+
+  const theme = avatarData.theme;
+  const moodMap = {
+    happy: { mouth: "smile", brow: -4, eye: 0, aura: "#DCFCE7" },
+    neutral: { mouth: "flat", brow: 0, eye: 0, aura: theme.soft },
+    sad: { mouth: "sad", brow: 3, eye: -1, aura: "#E5E7EB" },
+    stressed: { mouth: "tense", brow: 6, eye: -2, aura: "#FEE2E2" },
+  };
+  const moodCfg = moodMap[mood] ?? moodMap.neutral;
+
+  drawRoundedRect(ctx, 8, 8, 144, 144, 24, "#FFFFFF");
+  drawRoundedRect(ctx, 12, 12, 136, 136, 22, theme.soft);
+  ctx.fillStyle = moodCfg.aura;
+  ctx.beginPath();
+  ctx.arc(80, 68, 44, 0, Math.PI*2);
+  ctx.fill();
+
+  ctx.strokeStyle = theme.accent;
+  ctx.lineWidth = 8;
+  ctx.beginPath();
+  ctx.arc(80, 68, 48, 0.2, Math.PI * 1.85);
+  ctx.stroke();
+
+  const outfitColor = avatarData.outfit === "blazer" ? "#334155" : avatarData.outfit === "sweater" ? "#4F46E5" : "#0F766E";
+  drawRoundedRect(ctx, 40, 102, 80, 38, 18, outfitColor);
+  if(avatarData.outfit === "blazer"){
+    ctx.fillStyle = "#E2E8F0";
+    ctx.beginPath(); ctx.moveTo(80,106); ctx.lineTo(68,140); ctx.lineTo(92,140); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#1E293B";
+    ctx.fillRect(78,118,4,18);
+  }else if(avatarData.outfit === "hoodie"){
+    ctx.fillStyle = "#CCFBF1";
+    ctx.beginPath(); ctx.arc(80,110,12,0,Math.PI*2); ctx.fill();
+  }else{
+    ctx.fillStyle = "#C7D2FE";
+    ctx.fillRect(68,114,24,10);
+  }
+
+  if(avatarData.accessory === "card"){
+    drawRoundedRect(ctx, 101, 116, 16, 12, 3, "#FEF3C7");
+    ctx.fillStyle = "#F59E0B";
+    ctx.fillRect(104,119,10,2);
+  }else if(avatarData.accessory === "keys"){
+    ctx.strokeStyle = "#F59E0B";
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(110,120,5,0,Math.PI*2); ctx.stroke();
+    ctx.fillStyle = "#F59E0B";
+    ctx.fillRect(113,119,7,3);
+  }else if(avatarData.accessory === "strap"){
+    ctx.strokeStyle = "#93C5FD";
+    ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(52,105); ctx.lineTo(95,140); ctx.stroke();
+  }
+
+  drawRoundedRect(ctx, 70, 84, 20, 18, 8, avatarData.skin);
+  const jawRadius = avatarData.jaw === "square" ? 12 : avatarData.jaw === "soft" ? 20 : 16;
+  drawRoundedRect(ctx, 48, 28, 64, 64, jawRadius, avatarData.skin);
+  ctx.fillStyle = avatarData.skin;
+  ctx.fillRect(44,52,6,14);
+  ctx.fillRect(110,52,6,14);
+
+  ctx.fillStyle = avatarData.hairColor;
+  if(avatarData.hair === "buzz"){
+    drawRoundedRect(ctx, 50, 26, 60, 18, 12, avatarData.hairColor);
+  }else if(avatarData.hair === "crop"){
+    drawRoundedRect(ctx, 46, 22, 68, 26, 14, avatarData.hairColor);
+    ctx.fillRect(46,36,10,26);
+    ctx.fillRect(104,36,10,22);
+  }else if(avatarData.hair === "side"){
+    drawRoundedRect(ctx, 46, 22, 68, 24, 14, avatarData.hairColor);
+    ctx.fillRect(46,34,12,32);
+    ctx.beginPath(); ctx.moveTo(58,26); ctx.lineTo(96,26); ctx.lineTo(76,44); ctx.closePath(); ctx.fill();
+  }else if(avatarData.hair === "bob"){
+    drawRoundedRect(ctx, 44, 22, 72, 24, 16, avatarData.hairColor);
+    ctx.fillRect(44,36,14,38);
+    ctx.fillRect(102,36,14,38);
+  }else if(avatarData.hair === "wave"){
+    drawRoundedRect(ctx, 42, 22, 76, 26, 16, avatarData.hairColor);
+    ctx.beginPath(); ctx.moveTo(44,42); ctx.quadraticCurveTo(58,58,52,76); ctx.lineTo(42,78); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(116,42); ctx.quadraticCurveTo(102,58,108,78); ctx.lineTo(118,78); ctx.closePath(); ctx.fill();
+  }else if(avatarData.hair === "long"){
+    drawRoundedRect(ctx, 42, 22, 76, 24, 16, avatarData.hairColor);
+    ctx.fillRect(42,36,16,48);
+    ctx.fillRect(102,36,16,48);
+  }
+
+  const browY = 52 + moodCfg.eye;
+  const eyeY = 63 + moodCfg.eye;
+  ctx.strokeStyle = "#0F172A";
+  ctx.lineWidth = avatarData.brow === "strong" ? 4 : 3;
+  ctx.beginPath();
+  ctx.moveTo(60, browY + moodCfg.brow); ctx.lineTo(72, browY);
+  ctx.moveTo(88, browY); ctx.lineTo(100, browY + moodCfg.brow);
+  ctx.stroke();
+
+  ctx.fillStyle = "#0F172A";
+  ctx.beginPath(); ctx.ellipse(66, eyeY, 4, 5, 0, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(94, eyeY, 4, 5, 0, 0, Math.PI*2); ctx.fill();
+
+  ctx.strokeStyle = "rgba(15,23,42,.25)";
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(80,66); ctx.lineTo(77,76); ctx.lineTo(82,76); ctx.stroke();
+
+  ctx.strokeStyle = "#7C2D12";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  if(moodCfg.mouth === "smile"){
+    ctx.arc(80, 82, 10, 0.15, Math.PI - 0.15, false);
+  }else if(moodCfg.mouth === "sad"){
+    ctx.arc(80, 92, 10, Math.PI + 0.2, (Math.PI*2) - 0.2, false);
+  }else if(moodCfg.mouth === "tense"){
+    ctx.moveTo(71,84); ctx.lineTo(89,84);
+  }else{
+    ctx.moveTo(72,84); ctx.lineTo(88,84);
+  }
+  ctx.stroke();
+
+  if(mood === "stressed"){
+    ctx.fillStyle = "#60A5FA";
+    ctx.beginPath(); ctx.moveTo(112,52); ctx.lineTo(118,66); ctx.lineTo(108,66); ctx.closePath(); ctx.fill();
+  }else if(mood === "happy"){
+    ctx.fillStyle = "#FACC15";
+    ctx.beginPath(); ctx.arc(116,54,4,0,Math.PI*2); ctx.fill();
+    ctx.fillRect(115,46,2,5); ctx.fillRect(115,57,2,5); ctx.fillRect(108,53,5,2); ctx.fillRect(119,53,5,2);
+  }
+
+  drawRoundedRect(ctx, 22, 22, 42, 18, 9, theme.bg);
+  ctx.fillStyle = theme.ink;
+  ctx.font = "bold 10px system-ui";
+  ctx.fillText(theme.label, 30, 34);
+
+  ctx.fillStyle = avatarData.accent;
+  ctx.beginPath(); ctx.arc(126, 126, 10, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = "#FFFFFF";
+  ctx.font = "bold 10px system-ui";
+  const livingLetter = ({
+    wg:"W", miete:"M", eltern:"E", eigentum:"H"
+  })[(state.profile?.living) || (readProfile()?.living)] || "W";
+  ctx.fillText(livingLetter, 123, 129);
+
+  if(avatarData.family === "partner"){
+    ctx.fillStyle = "#F472B6";
+    ctx.fillRect(25,118,10,10);
+  }else if(avatarData.family === "kind"){
+    ctx.fillStyle = "#22C55E";
+    ctx.beginPath(); ctx.arc(30,123,6,0,Math.PI*2); ctx.fill();
+  }
+}
+
+function applyAvatarTheme(target, theme, mood){
+  const box = target ? target.closest(".avatarGameBox") : null;
+  if(!box || !theme) return;
+  box.style.setProperty("--avatar-bg", theme.soft);
+  box.style.setProperty("--avatar-accent", theme.accent);
+  box.style.setProperty("--avatar-ink", theme.ink);
+  box.setAttribute("data-mood", mood || "neutral");
 }
 
 function renderAvatarPreview(){
   drawAvatarOnCanvas("avatar", state.avatarData, state.previewMood || "neutral");
+  applyAvatarTheme(el("avatar"), state.avatarData.theme, state.previewMood || "neutral");
 }
 
 function renderGameAvatar(){
   if(!state.game) return;
   const mood = deriveAvatarMood(state.game);
   drawAvatarOnCanvas("gameAvatar", state.avatarData, mood);
-  el("avatarMoodLabel").textContent = mood === "happy" ? "glücklich" : mood === "sad" ? "traurig" : mood === "stressed" ? "gestresst" : "neutral";
+  applyAvatarTheme(el("gameAvatar"), state.avatarData.theme, mood);
+  el("avatarMoodLabel").textContent =
+    mood === "happy" ? "stabil" :
+    mood === "sad" ? "gedrückt" :
+    mood === "stressed" ? "gestresst" : "neutral";
   el("avatarMoodText").textContent =
-    mood === "happy" ? "Deine Figur wirkt gerade stabil und ziemlich zufrieden." :
-    mood === "sad" ? "Deine Figur wirkt gerade eher bedrückt. Das Budget drückt mit." :
-    mood === "stressed" ? "Zu viele Warnzeichen auf einmal: Die Figur ist sichtbar gestresst." :
-    "Im Moment ist die Lage okay, aber noch nicht ganz entspannt.";
+    mood === "happy" ? "Man sieht es sofort: genug Luft, ruhiger Blick, ordentliche Reserven." :
+    mood === "sad" ? "Die Lage zieht sichtbar runter. Wenig Puffer und wenig Leichtigkeit." :
+    mood === "stressed" ? "Viele Warnsignale gleichzeitig: angespannter Blick, harte Monatssituation." :
+    "Gerade ist die Lage gemischt. Noch nicht schlimm, aber auch nicht komplett entspannt.";
 }
-
 // ---------- Model ----------
 const JOB_NET = {
   it:          { ausbildung: 1100, studium: 950, job: 2500 },
@@ -464,7 +463,9 @@ function newGame(profile){
     historyBalance: [350],
     historyEtf: [0],
     hasRunThisMonth: false,
-    lastReceipt: null
+    lastReceipt: null,
+    effects: [],
+    sceneNote: "Monat startet ruhig. Noch ist alles offen."
   };
 }
 
@@ -486,7 +487,8 @@ function readProfile(){
 
 function updateInterviewPreview(){
   const p = readProfile();
-  syncAvatarFromProfile(p);
+  state.profile = p;
+  state.avatarData = buildAvatarFromProfile(p);
   const comfort = initialComfort(p);
   const social = initialSocial(p);
   let mood = "neutral";
@@ -496,8 +498,6 @@ function updateInterviewPreview(){
   renderAvatarPreview();
 
   const parts = [];
-  const fieldNames = { it:"IT", pflege:"Pflege", handwerk:"Handwerk", buero:"Büro", einzelhandel:"Einzelhandel" };
-  parts.push(`Die Hintergrundfarbe deines Avatars orientiert sich jetzt an deinem Bereich: ${fieldNames[p.field] || "Alltag"}.`);
   if(p.living === "eltern") parts.push("Du wohnst noch bei deinen Eltern. Das spart oft Miete, kann aber auch weniger Freiheit bedeuten.");
   if(p.living === "wg") parts.push("Du wohnst in einer WG. Das ist oft günstiger als allein wohnen.");
   if(p.living === "miete") parts.push("Du wohnst zur Miete. Das ist für viele ein realistischer Alltag.");
@@ -593,6 +593,7 @@ function renderWarnings(g){
   if(g.variable.subs >= 35) lamps.push({ cls:"warn", text:"● Viele Abos" });
   if(g.redMonths >= 2) lamps.push({ cls:"bad", text:"● Mehrere Minus-Monate" });
   if(g.loan.active) lamps.push({ cls:"warn", text:"● Laufender Kredit" });
+  if(g.effects?.length) lamps.push({ cls:"warn", text:`● ${g.effects.length} Nachwirkung(en)` });
   lamps.forEach(lamp=>{
     const div = document.createElement("div");
     div.className = `warnLamp ${lamp.cls}`;
@@ -720,7 +721,7 @@ function renderStats(g){
   el("gIncome").textContent = formatEUR(g.income);
   el("gCash").textContent = formatEUR(g.buckets.cash);
   el("gEtf").textContent = formatEUR(g.buckets.etf);
-  el("gBalanceHint").textContent = g.balance < g.dispoFloor ? "Kontosperre (Limit erreicht)" : (g.balance < 0 ? "Im Minus" : "OK");
+  el("gBalanceHint").textContent = g.sceneNote || (g.balance < g.dispoFloor ? "Kontosperre (Limit erreicht)" : (g.balance < 0 ? "Im Minus" : "OK"));
   el("gStabilityFill").style.width = `${g.stability}%`;
   el("gComfortFill").style.width = `${g.comfort}%`;
   el("gSocialFill").style.width = `${g.social}%`;
@@ -860,11 +861,52 @@ function impactPills({money=0, stability=0, comfort=0, social=0}){
   ];
 }
 
+
+function addEffect(g, effect){
+  g.effects.push({
+    id: "fx_" + Math.random().toString(16).slice(2,8),
+    name: effect.name,
+    months: effect.months || 1,
+    money: effect.money || 0,
+    stability: effect.stability || 0,
+    comfort: effect.comfort || 0,
+    social: effect.social || 0,
+    text: effect.text || ""
+  });
+}
+
+function processEffects(g){
+  if(!g.effects.length) return;
+  const stillActive = [];
+  for(const fx of g.effects){
+    if(fx.money){
+      g.balance += fx.money;
+      timelineItem(`Nachwirkung: ${fx.name}`, fx.money, fx.text || "Eine frühere Entscheidung wirkt weiter.");
+    }else{
+      timelineInfo(`Nachwirkung: ${fx.name}`, fx.text || "Eine frühere Entscheidung wirkt weiter.");
+    }
+    g.stability = clamp(g.stability + (fx.stability || 0), 0, 100);
+    g.comfort = clamp(g.comfort + (fx.comfort || 0), 0, 100);
+    g.social = clamp(g.social + (fx.social || 0), 0, 100);
+    fx.months -= 1;
+    if(fx.months > 0) stillActive.push(fx);
+  }
+  g.effects = stillActive;
+}
+
+function setSceneNote(g, text){
+  g.sceneNote = text;
+  const note = el("gBalanceHint");
+  if(note) note.textContent = text;
+}
+
 function applyOption(g, opt, title){
   g.balance += opt.money;
   g.stability = clamp(g.stability + opt.stability, 0, 100);
   g.comfort = clamp(g.comfort + opt.comfort, 0, 100);
   g.social = clamp(g.social + opt.social, 0, 100);
+  if(opt.effect) addEffect(g, opt.effect);
+  if(opt.scene) setSceneNote(g, opt.scene);
   timelineItem(title, opt.money, `${opt.label}: ${opt.meta}`);
 }
 
@@ -872,20 +914,20 @@ const DECISIONS = [
   {
     title:"Essen & Trinken",
     text:"Du merkst: Essen kippt den Monat. Was machst du?",
-    a:{ label:"Meal Prep", meta:"Planen und vorkochen.", money:+70, stability:+6, comfort:-1, social:0 },
-    b:{ label:"To-Go / Lieferung", meta:"Bequemer, aber teurer.", money:-70, stability:-2, comfort:+2, social:+1 },
+    a:{ label:"Meal Prep", meta:"Planen und vorkochen.", money:+70, stability:+6, comfort:-1, social:0, effect:{ name:"Meal-Prep-Routine", months:2, money:+20, stability:+1, text:"Du kaufst geplanter ein und gibst in den nächsten Monaten etwas weniger aus." }, scene:"Mehr Kontrolle im Alltag. Nicht glamourös, aber wirksam." },
+    b:{ label:"To-Go / Lieferung", meta:"Bequemer, aber teurer.", money:-70, stability:-2, comfort:+2, social:+1, effect:{ name:"Bequemlichkeitskosten", months:2, money:-20, stability:-1, text:"Spontane Bestellungen summieren sich weiter." }, scene:"Sehr bequem – aber das Budget merkt es sofort." },
   },
   {
     title:"Freizeit",
     text:"Freunde fragen: Kino heute?",
-    a:{ label:"Mitgehen", meta:"Kostet, aber du bist dabei.", money:-25, stability:-1, comfort:+1, social:+6 },
-    b:{ label:"Absagen", meta:"Du sparst, bist aber weniger dabei.", money:+10, stability:+2, comfort:0, social:-4 },
+    a:{ label:"Mitgehen", meta:"Kostet, aber du bist dabei.", money:-25, stability:-1, comfort:+1, social:+6, effect:{ name:"Sozialer Rückenwind", months:1, social:+2, text:"Du fühlst dich noch im nächsten Monat etwas verbundener." }, scene:"Teurer Abend, aber sozial ein klarer Gewinn." },
+    b:{ label:"Absagen", meta:"Du sparst, bist aber weniger dabei.", money:+10, stability:+2, comfort:0, social:-4, effect:{ name:"Rückzug", months:1, social:-2, text:"Weniger Teilhabe wirkt oft noch etwas nach." }, scene:"Finanziell vernünftig, sozial aber eher dünn." },
   },
   {
     title:"Abos prüfen",
     text:"Du merkst: Abos summieren sich.",
-    a:{ label:"Kündigen", meta:"2 Abos weg.", money:+18, stability:+3, comfort:-2, social:-1 },
-    b:{ label:"Behalten", meta:"Bleibt bequem, kostet aber weiter.", money:0, stability:-1, comfort:+1, social:0 },
+    a:{ label:"Kündigen", meta:"2 Abos weg.", money:+18, stability:+3, comfort:-2, social:-1, effect:{ name:"Dauerhaft aufgeräumt", months:3, money:+18, stability:+1, text:"Weniger laufende Verträge entlasten auch die nächsten Monate." }, scene:"Weniger Komfort, aber deutlich klarerer Monatsplan." },
+    b:{ label:"Behalten", meta:"Bleibt bequem, kostet aber weiter.", money:0, stability:-1, comfort:+1, social:0, effect:{ name:"Abo zieht weiter", months:3, money:-18, stability:-1, text:"Kleine Beträge nerven auch später." }, scene:"Es bleibt bequem – und dauerhaft etwas enger." },
   },
 ];
 
@@ -899,8 +941,8 @@ const EVENTS = [
         title:"Handy kaputt",
         text:"Was machst du?",
         options:[
-          { label:"Reparieren", meta:"Billiger, aber nicht perfekt.", impacts:impactPills({money:-120, stability:-1, comfort:-1, social:-1}), onPick:()=>{ applyOption(g, {label:"Reparieren", meta:"Billiger.", money:-120, stability:-1, comfort:-1, social:-1}, "Ereignis"); finalizeMonth(g); } },
-          { label:"Neu kaufen", meta:"Teurer, aber bequemer.", impacts:impactPills({money:-420, stability:-2, comfort:+2, social:+2}), onPick:()=>{ applyOption(g, {label:"Neu kaufen", meta:"Teurer.", money:-420, stability:-2, comfort:+2, social:+2}, "Ereignis"); finalizeMonth(g); } }
+          { label:"Reparieren", meta:"Billiger, aber nicht perfekt.", impacts:impactPills({money:-120, stability:-1, comfort:-1, social:-1}), onPick:()=>{ applyOption(g, {label:"Reparieren", meta:"Billiger.", money:-120, stability:-1, comfort:-1, social:-1, effect:{ name:"Wackeliges Handy", months:2, comfort:-1, text:"Das reparierte Handy nervt noch etwas nach." }, scene:"Gerettet, aber nicht wirklich elegant."}, "Ereignis"); finalizeMonth(g); } },
+          { label:"Neu kaufen", meta:"Teurer, aber bequemer.", impacts:impactPills({money:-420, stability:-2, comfort:+2, social:+2}), onPick:()=>{ applyOption(g, {label:"Neu kaufen", meta:"Teurer.", money:-420, stability:-2, comfort:+2, social:+2, effect:{ name:"Neues Gerät, neue Rate im Kopf", months:1, stability:-1, text:"Große Anschaffungen drücken oft noch kurz nach." }, scene:"Technisch entspannt, finanziell aber ein echter Schlag."}, "Ereignis"); finalizeMonth(g); } }
         ]
       });
     }
@@ -913,8 +955,8 @@ const EVENTS = [
         title:"Bonus",
         text:"Was machst du mit dem Extra-Geld?",
         options:[
-          { label:"Einfach behalten", meta:"Mehr Luft auf dem Konto.", impacts:impactPills({money:+120, stability:+2, comfort:+1, social:+1}), onPick:()=>{ applyOption(g, {label:"Behalten", meta:"Mehr Luft.", money:+120, stability:+2, comfort:+1, social:+1}, "Ereignis"); finalizeMonth(g); } },
-          { label:"Teil sparen", meta:"Etwas direkt in den Notgroschen.", impacts:impactPills({money:+120, stability:+3, comfort:0, social:0}), onPick:()=>{ applyOption(g, {label:"Teil sparen", meta:"Du legst direkt was weg.", money:+120, stability:+3, comfort:0, social:0}, "Ereignis"); g.buckets.cash += 80; g.balance -= 80; timelineItem("Bonus → Notgroschen", -80, "Direkt Rücklage erhöht."); finalizeMonth(g); } }
+          { label:"Einfach behalten", meta:"Mehr Luft auf dem Konto.", impacts:impactPills({money:+120, stability:+2, comfort:+1, social:+1}), onPick:()=>{ applyOption(g, {label:"Behalten", meta:"Mehr Luft.", money:+120, stability:+2, comfort:+1, social:+1, scene:"Ein seltener ruhiger Moment: einmal nicht sofort knapp."}, "Ereignis"); finalizeMonth(g); } },
+          { label:"Teil sparen", meta:"Etwas direkt in den Notgroschen.", impacts:impactPills({money:+120, stability:+3, comfort:0, social:0}), onPick:()=>{ applyOption(g, {label:"Teil sparen", meta:"Du legst direkt was weg.", money:+120, stability:+3, comfort:0, social:0, scene:"Nicht spektakulär, aber sehr stark: Reserve wächst sichtbar."}, "Ereignis"); g.buckets.cash += 80; g.balance -= 80; timelineItem("Bonus → Notgroschen", -80, "Direkt Rücklage erhöht."); finalizeMonth(g); } }
         ]
       });
     }
@@ -950,6 +992,7 @@ function runMonth(){
   if(g.hasRunThisMonth) return;
   timelineClear();
   timelineInfo(`Monat ${g.month} startet`, "Du siehst jetzt Schritt für Schritt, wo das Geld hingeht.");
+  processEffects(g);
   g.balance += g.income;
   timelineItem("Einkommen (Netto)", g.income, "Das ist dein Geld für diesen Monat.");
   const f = g.fixed;
@@ -1047,8 +1090,13 @@ function finalizeMonth(g){
     g.redMonths += 1;
     g.social = clamp(g.social - 2, 0, 100);
     g.comfort = clamp(g.comfort - 1, 0, 100);
+    setSceneNote(g, "Monatsende mit Druck: Konto angespannt, Stimmung kippt leicht.");
+  } else if(g.buckets.cash >= 1000) {
+    g.social = clamp(g.social + 1, 0, 100);
+    setSceneNote(g, "Monatsende wirkt stabil. Rücklage gibt sichtbar Sicherheit.");
   } else {
     g.social = clamp(g.social + 1, 0, 100);
+    setSceneNote(g, "Monatsende okay – nicht luxuriös, aber unter Kontrolle.");
   }
   g.historyBalance.push(g.balance);
   g.historyEtf.push(g.buckets.etf);
@@ -1118,6 +1166,7 @@ function setView(view){
 function startGame(){
   const profile = readProfile();
   state.profile = profile;
+  state.avatarData = buildAvatarFromProfile(profile);
   state.game = newGame(profile);
   setView("game");
   timelineClear();
