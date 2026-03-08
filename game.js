@@ -90,11 +90,43 @@ const state = {
   previewMood: "neutral"
 };
 
-function regenAvatar(){
-  avatarSalt++;
-  const seed = (Date.now() + avatarSalt) & 0xffffffff;
+function hashString(str){
+  let h = 2166136261;
+  for(let i = 0; i < str.length; i++){
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function getAvatarProfileSeed(profile){
+  if(!profile) return 1337;
+  const key = [
+    profile.path,
+    profile.field,
+    profile.living,
+    profile.family,
+    profile.style,
+    profile.lifeFood,
+    profile.lifeFun,
+    profile.lifeShop,
+    profile.lifeSubs,
+    profile.lifeMobility,
+    avatarSalt
+  ].join("|");
+  return hashString(key);
+}
+
+function syncAvatarFromProfile(profile){
+  const seed = getAvatarProfileSeed(profile);
   state.avatarSeed = seed;
   state.avatarData = makeAvatarData(seed);
+}
+
+function regenAvatar(){
+  avatarSalt++;
+  const profile = readProfile();
+  syncAvatarFromProfile(profile);
   renderAvatarPreview();
 }
 
@@ -267,6 +299,7 @@ function readProfile(){
 
 function updateInterviewPreview(){
   const p = readProfile();
+  syncAvatarFromProfile(p);
   const comfort = initialComfort(p);
   const social = initialSocial(p);
   let mood = "neutral";
