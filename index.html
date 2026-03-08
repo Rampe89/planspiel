@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>MoneyQuest – Planspiel</title>
   <link rel="stylesheet" href="style.css" />
+  <script src="game.js" defer></script>
 </head>
 <body>
   <main class="app">
@@ -23,6 +24,7 @@
       </div>
     </header>
 
+    <!-- SCREEN: INTERVIEW -->
     <section class="screen" id="screenInterview">
       <div class="layout">
         <div class="panel side">
@@ -183,6 +185,7 @@
       </div>
     </section>
 
+    <!-- SCREEN: GAME -->
     <section class="screen hidden" id="screenGame">
       <div class="gameHud">
         <div class="statCard">
@@ -191,7 +194,7 @@
         </div>
 
         <div class="statCard">
-          <div class="statLabel">Kontostand <button class="tip" data-tip="Geld auf deinem Hauptkonto. Wenn es unter 0 rutscht, bist du im Minus.">?</button></div>
+          <div class="statLabel">Kontostand</div>
           <div class="statValue" id="gBalance">0 €</div>
           <div class="statTiny" id="gBalanceHint"></div>
         </div>
@@ -236,7 +239,6 @@
         </div>
       </div>
 
-      <div class="progressDots" id="progressDots"></div>
       <div class="warningStrip" id="warningStrip"></div>
 
       <div class="questRow">
@@ -250,11 +252,11 @@
 
         <div class="kpis">
           <div class="kpi">
-            <div class="kpiLabel">Notgroschen <button class="tip" data-tip="Rücklage für Notfälle. Im echten Leben ist das oft die wichtigste erste Reserve.">?</button></div>
+            <div class="kpiLabel">Notgroschen</div>
             <div class="kpiValue" id="gCash">0 €</div>
           </div>
           <div class="kpi">
-            <div class="kpiLabel">ETF-Depot <button class="tip" data-tip="Langfristiges Investieren. Kann im Wert steigen oder fallen.">?</button></div>
+            <div class="kpiLabel">ETF-Depot</div>
             <div class="kpiValue" id="gEtf">0 €</div>
           </div>
         </div>
@@ -310,6 +312,7 @@
 
         <div class="panel side">
           <div class="stack">
+
             <div class="cardBox avatarGameBox">
               <div class="boxHead">
                 <h3>Dein Avatar</h3>
@@ -329,13 +332,25 @@
               <p class="small">Hier planst du, wie viel du jeden Monat zurücklegst.</p>
 
               <div class="field">
-                <label>Notgroschen (€/Monat) <button class="tip" data-tip="Notgroschen = Geld, das schnell verfügbar ist, wenn etwas Unerwartetes passiert.">?</button></label>
+                <label>
+                  Notgroschen
+                  <span class="tip">
+                    <button class="tipBtn" type="button" aria-label="Info Notgroschen">?</button>
+                    <span class="tipBox">Rücklage für Notfälle wie kaputtes Handy, Waschmaschine oder andere plötzliche Kosten.</span>
+                  </span>
+                </label>
                 <input id="inpCash" type="number" min="0" step="10" value="100" />
                 <div class="hintLine">Geld für Notfälle. Im echten Leben sehr wichtig.</div>
               </div>
 
               <div class="field">
-                <label>ETF (€/Monat) <button class="tip" data-tip="ETF = Fonds mit vielen Aktien. Gut für langfristigen Aufbau, aber nicht ohne Schwankung.">?</button></label>
+                <label>
+                  ETF
+                  <span class="tip">
+                    <button class="tipBtn" type="button" aria-label="Info ETF">?</button>
+                    <span class="tipBox">Ein ETF ist eine Form von langfristigem Investieren. Der Wert kann steigen oder fallen.</span>
+                  </span>
+                </label>
                 <input id="inpEtf" type="number" min="0" step="10" value="100" />
                 <div class="hintLine">Langfristiges Investieren. Kann schwanken.</div>
               </div>
@@ -376,7 +391,13 @@
               <p class="small">Ein Kredit hilft sofort, kostet aber später weiter Geld.</p>
 
               <div class="field">
-                <label>Kredittyp <button class="tip" data-tip="Dispo ist oft besonders teuer. Ein Kredit kann helfen, macht künftige Monate aber enger.">?</button></label>
+                <label>
+                  Kredittyp
+                  <span class="tip">
+                    <button class="tipBtn" type="button" aria-label="Info Kredit">?</button>
+                    <span class="tipBox">Ein Kredit bringt sofort Geld, macht die nächsten Monate aber enger, weil Raten zurückgezahlt werden.</span>
+                  </span>
+                </label>
                 <select id="loanType">
                   <option value="konsum">Konsum (6% p.a.)</option>
                   <option value="auto">Auto (4% p.a.)</option>
@@ -448,7 +469,5 @@
       <div class="toastText" id="toastText"></div>
     </div>
   </main>
-
-  <script src="game.js"></script>
 </body>
 </html>
