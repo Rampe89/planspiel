@@ -18,258 +18,148 @@ function toast(title, text){
   setTimeout(()=> el("toast").classList.add("hidden"), 2400);
 }
 
-
 // ---------- Avatar ----------
-const FIELD_THEMES = {
-  it:          { bg:"#0F172A", ink:"#93C5FD", soft:"#172554", accent:"#38BDF8", label:"IT" },
-  pflege:      { bg:"#052e16", ink:"#86EFAC", soft:"#14532d", accent:"#34D399", label:"Pflege" },
-  handwerk:    { bg:"#431407", ink:"#FDBA74", soft:"#7c2d12", accent:"#FB923C", label:"Handwerk" },
-  buero:       { bg:"#111827", ink:"#CBD5E1", soft:"#334155", accent:"#94A3B8", label:"Büro" },
-  einzelhandel:{ bg:"#3b0764", ink:"#E9D5FF", soft:"#6b21a8", accent:"#C084FC", label:"Einzelhandel" },
+const AVATAR_PALETTES = {
+  hair: ["#111827","#1F2937","#3F3F46","#7C2D12","#4B5563"],
+  skin: ["#F2D6C9","#F6E0C6","#DDB7A0","#CFA08A","#EBC7B0"],
+  shirt:["#2563EB","#16A34A","#F97316","#7C3AED","#0EA5E9","#EC4899"],
+  bg:   ["#E2E8F0","#DCFCE7","#E0F2FE","#FEF3C7","#FCE7F3"]
 };
-
-const LIVING_ACCENTS = { wg:"#22C55E", miete:"#2563EB", eltern:"#F59E0B", eigentum:"#8B5CF6" };
-const PATH_OUTFITS = { ausbildung:"hoodie", studium:"sweater", job:"blazer" };
-
-function hashString(str){
-  let h = 2166136261 >>> 0;
-  for(let i=0;i<str.length;i++){
-    h ^= str.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-}
 
 function seededRng(seed){
   let s = seed || 1337;
   return () => (s = (s*1664525 + 1013904223) >>> 0) / 4294967296;
 }
 
-function choose(arr, rng){ return arr[Math.floor(rng() * arr.length)]; }
+function makeAvatarData(seed){
+  const r = seededRng(seed);
+  return {
+    bg: AVATAR_PALETTES.bg[Math.floor(r()*AVATAR_PALETTES.bg.length)],
+    skin: AVATAR_PALETTES.skin[Math.floor(r()*AVATAR_PALETTES.skin.length)],
+    hair: AVATAR_PALETTES.hair[Math.floor(r()*AVATAR_PALETTES.hair.length)],
+    shirt: AVATAR_PALETTES.shirt[Math.floor(r()*AVATAR_PALETTES.shirt.length)],
+    eyeOffset: Math.floor(r()*2),
+    fringe: Math.floor(r()*2),
+  };
+}
+
+function drawAvatarOnCanvas(canvasId, avatarData, mood="neutral"){
+  const c = el(canvasId);
+  if(!c) return;
+  const ctx = c.getContext("2d");
+  ctx.imageSmoothingEnabled = false;
+  ctx.clearRect(0,0,16,16);
+
+  ctx.fillStyle = avatarData.bg;
+  ctx.fillRect(0,0,16,16);
+
+  ctx.fillStyle = avatarData.skin;
+  ctx.fillRect(4,4,8,8);
+
+  ctx.fillStyle = avatarData.hair;
+  ctx.fillRect(4,4,8,3);
+  if(avatarData.fringe) ctx.fillRect(5,6,2,1);
+
+  ctx.fillStyle = "#111827";
+  ctx.fillRect(6,7 + avatarData.eyeOffset,1,1);
+  ctx.fillRect(9,7 + avatarData.eyeOffset,1,1);
+
+  if(mood === "happy"){
+    ctx.fillRect(7,10,2,1);
+    ctx.clearRect(7,9,2,1);
+  } else if(mood === "sad" || mood === "stressed"){
+    ctx.fillRect(7,9,2,1);
+    ctx.clearRect(7,10,2,1);
+    if(mood === "stressed") ctx.fillRect(6,6,1,1);
+  } else {
+    ctx.fillRect(7,10,2,1);
+  }
+
+  ctx.fillStyle = avatarData.shirt;
+  ctx.fillRect(4,12,8,4);
+  ctx.fillStyle = "rgba(255,255,255,.85)";
+  ctx.fillRect(7,13,2,1);
+}
 
 let avatarSalt = 0;
 const state = {
   profile: null,
   game: null,
-  avatarData: null,
+  avatarSeed: 1337,
+  avatarData: makeAvatarData(1337),
   previewMood: "neutral"
 };
 
-function getProfileSeed(profile){
+function hashString(str){
+  let h = 2166136261;
+  for(let i = 0; i < str.length; i++){
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function getAvatarProfileSeed(profile){
   if(!profile) return 1337;
-  return hashString([
-    profile.style,
-    profile.field,
+  const key = [
     profile.path,
+    profile.field,
     profile.living,
     profile.family,
+    profile.style,
     profile.lifeFood,
     profile.lifeFun,
     profile.lifeShop,
     profile.lifeSubs,
     profile.lifeMobility,
     avatarSalt
-  ].join("|"));
-}
-
-function buildAvatarFromProfile(profile){
-  const seed = getProfileSeed(profile);
-  const rng = seededRng(seed);
-  const theme = FIELD_THEMES[profile?.field] ?? FIELD_THEMES.it;
-  const styleKey = profile?.style ?? "neutral";
-  const skin = choose(["#F8D7C4","#F0C6AA","#E8BC9D","#DCA98A","#C98D6D"], rng);
-  const hairPools = {
-    masc: ["buzz","crop","side"],
-    fem: ["bob","wave","long"],
-    neutral: ["crop","bob","side"]
-  };
-  const jawPools = { masc:"square", fem:"soft", neutral:"mid" };
-  const browPools = { masc:"strong", fem:"soft", neutral:rng()>.5?"soft":"strong" };
-  const eyePools = { masc:"almond", fem:"round", neutral:rng()>.5?"almond":"round" };
-  const nosePools = { masc:"straight", fem:"small", neutral:rng()>.5?"small":"straight" };
-  const hair = choose(hairPools[styleKey] ?? hairPools.neutral, rng);
-  const hairColor = choose(
-    styleKey === "fem"
-      ? ["#111827","#3F3F46","#6B7280","#7C2D12"]
-      : styleKey === "masc"
-      ? ["#111827","#1F2937","#4B5563","#7C2D12"]
-      : ["#111827","#374151","#6B7280","#7C2D12"],
-    rng
-  );
-  const outfit = PATH_OUTFITS[profile?.path] ?? "hoodie";
-  const accessory =
-    profile?.lifeMobility === "bike" ? "strap" :
-    profile?.lifeMobility === "car" ? "keys" :
-    profile?.lifeMobility === "ticket" ? "card" : "none";
-  return {
-    seed, theme, skin, hair, hairColor,
-    brow: browPools[styleKey] ?? "soft",
-    jaw: jawPools[styleKey] ?? "mid",
-    eyeShape: eyePools[styleKey] ?? "almond",
-    noseShape: nosePools[styleKey] ?? "small",
-    outfit, accessory,
-    accent: LIVING_ACCENTS[profile?.living] ?? "#2563EB",
-    family: profile?.family ?? "single",
-    styleKey
-  };
+  ].join("|");
+  return hashString(key);
 }
 
 function syncAvatarFromProfile(profile){
-  state.avatarData = buildAvatarFromProfile(profile);
+  const seed = getAvatarProfileSeed(profile);
+  state.avatarSeed = seed;
+  state.avatarData = makeAvatarData(seed);
 }
 
 function regenAvatar(){
-  avatarSalt = (avatarSalt + 1) % 4;
-  const profile = state.profile || readProfile();
+  avatarSalt++;
+  const profile = readProfile();
   syncAvatarFromProfile(profile);
   renderAvatarPreview();
-  if(state.game) renderGameAvatar();
 }
 
 function deriveAvatarMood(g){
   if(!g) return "neutral";
   if(g.balance <= g.dispoFloor || g.redMonths >= 3) return "stressed";
   const score =
-    (g.balance >= 250 ? 2 : g.balance >= 0 ? 1 : -2) +
-    (g.buckets.cash >= 1000 ? 2 : g.buckets.cash >= 300 ? 1 : -1) +
-    (g.stability >= 70 ? 1 : g.stability <= 35 ? -1 : 0) +
-    (g.social >= 62 ? 1 : g.social <= 30 ? -1 : 0) +
-    (g.comfort >= 62 ? 1 : g.comfort <= 30 ? -1 : 0);
-  if(score >= 3) return "happy";
+    (g.balance >= 0 ? 1 : -2) +
+    (g.buckets.cash >= 500 ? 1 : -1) +
+    (g.stability >= 65 ? 1 : g.stability <= 35 ? -1 : 0) +
+    (g.social >= 60 ? 1 : g.social <= 30 ? -1 : 0) +
+    (g.comfort >= 60 ? 1 : g.comfort <= 30 ? -1 : 0);
+  if(score >= 2) return "happy";
   if(score <= -2) return "sad";
   return "neutral";
 }
 
-function drawRoundedRect(ctx, x, y, w, h, r, fill){
-  ctx.fillStyle = fill;
-  ctx.beginPath();
-  ctx.moveTo(x+r,y);
-  ctx.arcTo(x+w,y,x+w,y+h,r);
-  ctx.arcTo(x+w,y+h,x,y+h,r);
-  ctx.arcTo(x,y+h,x,y,r);
-  ctx.arcTo(x,y,x+w,y,r);
-  ctx.closePath();
-  ctx.fill();
+function renderAvatarPreview(){
+  drawAvatarOnCanvas("avatar", state.avatarData, state.previewMood || "neutral");
 }
-
-function drawAvatarOnCanvas(canvasId, avatarData, mood="neutral"){
-  const c = el(canvasId);
-  if(!c || !avatarData) return;
-  const size = 160;
-  const scale = Math.max(2, Math.floor(window.devicePixelRatio || 2));
-  c.width = size * scale;
-  c.height = size * scale;
-  c.style.width = size + "px";
-  c.style.height = size + "px";
-  const ctx = c.getContext("2d");
-  ctx.setTransform(scale,0,0,scale,0,0);
-  ctx.clearRect(0,0,size,size);
-  const theme = avatarData.theme;
-  const moodMap = {
-    happy: { mouth: "smile", brow: -4, eye: 0, aura: "rgba(34,197,94,.18)" },
-    neutral: { mouth: "flat", brow: 0, eye: 0, aura: "rgba(148,163,184,.12)" },
-    sad: { mouth: "sad", brow: 3, eye: -1, aura: "rgba(148,163,184,.10)" },
-    stressed: { mouth: "tense", brow: 6, eye: -2, aura: "rgba(239,68,68,.14)" },
-  };
-  const moodCfg = moodMap[mood] ?? moodMap.neutral;
-
-  drawRoundedRect(ctx, 8, 8, 144, 144, 24, "rgba(255,255,255,.05)");
-  drawRoundedRect(ctx, 12, 12, 136, 136, 22, theme.soft);
-  ctx.fillStyle = moodCfg.aura;
-  ctx.beginPath();
-  ctx.arc(80, 68, 44, 0, Math.PI*2);
-  ctx.fill();
-  ctx.strokeStyle = theme.accent;
-  ctx.lineWidth = 8;
-  ctx.beginPath();
-  ctx.arc(80, 68, 48, 0.2, Math.PI * 1.85);
-  ctx.stroke();
-
-  const outfitColor = avatarData.outfit === "blazer" ? "#334155" : avatarData.outfit === "sweater" ? "#4F46E5" : "#0F766E";
-  drawRoundedRect(ctx, 40, 102, 80, 38, 18, outfitColor);
-  if(avatarData.outfit === "blazer"){
-    ctx.fillStyle = "#E2E8F0";
-    ctx.beginPath(); ctx.moveTo(80,106); ctx.lineTo(68,140); ctx.lineTo(92,140); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = "#1E293B"; ctx.fillRect(78,118,4,18);
-  }else if(avatarData.outfit === "hoodie"){
-    ctx.fillStyle = "#CCFBF1"; ctx.beginPath(); ctx.arc(80,110,12,0,Math.PI*2); ctx.fill();
-  }else{ ctx.fillStyle = "#C7D2FE"; ctx.fillRect(68,114,24,10); }
-
-  if(avatarData.accessory === "card"){
-    drawRoundedRect(ctx, 101, 116, 16, 12, 3, "#FEF3C7"); ctx.fillStyle = "#F59E0B"; ctx.fillRect(104,119,10,2);
-  }else if(avatarData.accessory === "keys"){
-    ctx.strokeStyle = "#F59E0B"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(110,120,5,0,Math.PI*2); ctx.stroke(); ctx.fillStyle = "#F59E0B"; ctx.fillRect(113,119,7,3);
-  }else if(avatarData.accessory === "strap"){
-    ctx.strokeStyle = "#93C5FD"; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(52,105); ctx.lineTo(95,140); ctx.stroke();
-  }
-
-  drawRoundedRect(ctx, 70, 84, 20, 18, 8, avatarData.skin);
-  const jawRadius = avatarData.jaw === "square" ? 12 : avatarData.jaw === "soft" ? 20 : 16;
-  drawRoundedRect(ctx, 48, 28, 64, 64, jawRadius, avatarData.skin);
-  ctx.fillStyle = avatarData.skin; ctx.fillRect(44,52,6,14); ctx.fillRect(110,52,6,14);
-
-  ctx.fillStyle = avatarData.hairColor;
-  if(avatarData.hair === "buzz"){
-    drawRoundedRect(ctx, 50, 26, 60, 18, 12, avatarData.hairColor);
-  }else if(avatarData.hair === "crop"){
-    drawRoundedRect(ctx, 46, 22, 68, 26, 14, avatarData.hairColor); ctx.fillRect(46,36,10,26); ctx.fillRect(104,36,10,22);
-  }else if(avatarData.hair === "side"){
-    drawRoundedRect(ctx, 46, 22, 68, 24, 14, avatarData.hairColor); ctx.fillRect(46,34,12,32); ctx.beginPath(); ctx.moveTo(58,26); ctx.lineTo(96,26); ctx.lineTo(76,44); ctx.closePath(); ctx.fill();
-  }else if(avatarData.hair === "bob"){
-    drawRoundedRect(ctx, 44, 22, 72, 24, 16, avatarData.hairColor); ctx.fillRect(44,36,14,38); ctx.fillRect(102,36,14,38);
-  }else if(avatarData.hair === "wave"){
-    drawRoundedRect(ctx, 42, 22, 76, 26, 16, avatarData.hairColor); ctx.beginPath(); ctx.moveTo(44,42); ctx.quadraticCurveTo(58,58,52,76); ctx.lineTo(42,78); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.moveTo(116,42); ctx.quadraticCurveTo(102,58,108,78); ctx.lineTo(118,78); ctx.closePath(); ctx.fill();
-  }else if(avatarData.hair === "long"){
-    drawRoundedRect(ctx, 42, 22, 76, 24, 16, avatarData.hairColor); ctx.fillRect(42,36,16,48); ctx.fillRect(102,36,16,48);
-  }
-
-  const browY = 52 + moodCfg.eye; const eyeY = 63 + moodCfg.eye;
-  ctx.strokeStyle = "#0F172A"; ctx.lineWidth = avatarData.brow === "strong" ? 4 : 3; ctx.beginPath(); ctx.moveTo(60, browY + moodCfg.brow); ctx.lineTo(72, browY); ctx.moveTo(88, browY); ctx.lineTo(100, browY + moodCfg.brow); ctx.stroke();
-  ctx.fillStyle = "#0F172A";
-  if(avatarData.eyeShape === "round"){
-    ctx.beginPath(); ctx.ellipse(66, eyeY, 4.5, 5.5, 0, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.ellipse(94, eyeY, 4.5, 5.5, 0, 0, Math.PI*2); ctx.fill();
-  }else{
-    ctx.beginPath(); ctx.ellipse(66, eyeY, 5.2, 4.2, 0, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.ellipse(94, eyeY, 5.2, 4.2, 0, 0, Math.PI*2); ctx.fill();
-  }
-  ctx.strokeStyle = "rgba(15,23,42,.25)"; ctx.lineWidth = 2; ctx.beginPath();
-  if(avatarData.noseShape === "straight"){ ctx.moveTo(80,66); ctx.lineTo(79,77); ctx.lineTo(82,77); }
-  else { ctx.moveTo(80,68); ctx.lineTo(77,75); ctx.lineTo(82,76); }
-  ctx.stroke();
-  ctx.strokeStyle = "#7C2D12"; ctx.lineWidth = 3; ctx.beginPath();
-  if(moodCfg.mouth === "smile") ctx.arc(80, 82, 10, 0.15, Math.PI - 0.15, false);
-  else if(moodCfg.mouth === "sad") ctx.arc(80, 92, 10, Math.PI + 0.2, (Math.PI*2) - 0.2, false);
-  else if(moodCfg.mouth === "tense"){ ctx.moveTo(71,84); ctx.lineTo(89,84); }
-  else { ctx.moveTo(72,84); ctx.lineTo(88,84); }
-  ctx.stroke();
-
-  if(mood === "stressed"){
-    ctx.fillStyle = "#60A5FA"; ctx.beginPath(); ctx.moveTo(112,52); ctx.lineTo(118,66); ctx.lineTo(108,66); ctx.closePath(); ctx.fill();
-  }else if(mood === "happy"){
-    ctx.fillStyle = "#FACC15"; ctx.beginPath(); ctx.arc(116,54,4,0,Math.PI*2); ctx.fill(); ctx.fillRect(115,46,2,5); ctx.fillRect(115,57,2,5); ctx.fillRect(108,53,5,2); ctx.fillRect(119,53,5,2);
-  }
-
-  drawRoundedRect(ctx, 22, 22, 42, 18, 9, "rgba(255,255,255,.08)");
-  ctx.fillStyle = theme.ink; ctx.font = "bold 10px system-ui"; ctx.fillText(theme.label, 30, 34);
-  ctx.fillStyle = avatarData.accent; ctx.beginPath(); ctx.arc(126, 126, 10, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = "#FFFFFF"; ctx.font = "bold 10px system-ui";
-  const livingLetter = ({ wg:"W", miete:"M", eltern:"E", eigentum:"H" })[(state.profile?.living) || (readProfile()?.living)] || "W";
-  ctx.fillText(livingLetter, 123, 129);
-  if(avatarData.family === "partner"){ ctx.fillStyle = "#F472B6"; ctx.fillRect(25,118,10,10); }
-  else if(avatarData.family === "kind"){ ctx.fillStyle = "#22C55E"; ctx.beginPath(); ctx.arc(30,123,6,0,Math.PI*2); ctx.fill(); }
-}
-
-function renderAvatarPreview(){ drawAvatarOnCanvas("avatar", state.avatarData, state.previewMood || "neutral"); }
 
 function renderGameAvatar(){
   if(!state.game) return;
   const mood = deriveAvatarMood(state.game);
   drawAvatarOnCanvas("gameAvatar", state.avatarData, mood);
-  el("avatarMoodLabel").textContent = mood === "happy" ? "stabil" : mood === "sad" ? "gedrückt" : mood === "stressed" ? "gestresst" : "neutral";
+  el("avatarMoodLabel").textContent = mood === "happy" ? "glücklich" : mood === "sad" ? "traurig" : mood === "stressed" ? "gestresst" : "neutral";
   el("avatarMoodText").textContent =
-    mood === "happy" ? "Man sieht es sofort: genug Luft, ruhiger Blick, ordentliche Reserven." :
-    mood === "sad" ? "Die Lage zieht sichtbar runter. Wenig Puffer und wenig Leichtigkeit." :
-    mood === "stressed" ? "Viele Warnsignale gleichzeitig: angespannter Blick, harte Monatssituation." :
-    "Gerade ist die Lage gemischt. Noch nicht schlimm, aber auch nicht komplett entspannt.";
+    mood === "happy" ? "Deine Lage ist gerade ziemlich stabil." :
+    mood === "sad" ? "Deine Figur merkt: Es läuft gerade eher schwierig." :
+    mood === "stressed" ? "Viele Warnzeichen gleichzeitig. Das fühlt sich anstrengend an." :
+    "Im Moment ist die Lage gemischt.";
 }
+
 // ---------- Model ----------
 const JOB_NET = {
   it:          { ausbildung: 1100, studium: 950, job: 2500 },
@@ -314,6 +204,89 @@ const LOAN_TYPES = {
   dispo:  { label:"Dispo",  apr: 11.0, minMonths: 6,  maxMonths: 24 },
 };
 
+
+const LIFE_PHASES = [
+  { key:"survival", name:"Überleben", desc:"Gerade geht es vor allem darum, nicht abzusaufen und kleine Löcher zu stopfen.", perk:"Kleine Ziele, hohe Aufmerksamkeit", next:"stability" },
+  { key:"stability", name:"Stabilität", desc:"Du bekommst Struktur ins Budget. Nicht reich, aber kontrollierter.", perk:"Mehr Spielraum für Planung", next:"safety" },
+  { key:"safety", name:"Sicherheit", desc:"Rücklagen geben dir Luft. Fehler tun weh, werfen dich aber nicht sofort um.", perk:"Weniger Krisendruck", next:"growth" },
+  { key:"growth", name:"Aufbau", desc:"Jetzt geht es nicht nur ums Überleben, sondern um echten Aufbau.", perk:"Langfristiger Vermögensaufbau", next:null },
+];
+
+const ACHIEVEMENTS = [
+  { key:"first_buffer", title:"Erster Puffer", text:"Du hast 300 € Notgroschen erreicht.", check:g=>g.buckets.cash >= 300 },
+  { key:"big_buffer", title:"Starker Notgroschen", text:"Du hast 1.000 € Rücklage aufgebaut.", check:g=>g.buckets.cash >= 1000 },
+  { key:"first_etf", title:"Erster ETF-Schritt", text:"Du hast erstmals in ETF investiert.", check:g=>g.buckets.etf > 0 },
+  { key:"three_green", title:"Saubere Serie", text:"Drei Monate in Folge nicht im Minus.", check:g=>g.greenMonthsStreak >= 3 },
+  { key:"side_hustle", title:"Nebenjob-Mindset", text:"Du hast dir zusätzlich Einkommen organisiert.", check:g=>g.sideJobUsed },
+  { key:"new_home", title:"Kosten clever gedrückt", text:"Du bist in eine WG gezogen und senkst deine Wohnkosten.", check:g=>g.movedToWG },
+  { key:"loan_free", title:"Schuldenfrei", text:"Kein laufender Kredit mehr und trotzdem im Plus.", check:g=>!g.loan.active && g.month >= 6 && g.balance >= 0 },
+  { key:"no_crash_half", title:"Halbzeit ohne Absturz", text:"Nach 6 Monaten noch kein Minus-Monat.", check:g=>g.month >= 6 && g.redMonths === 0 },
+];
+
+const DRAMATIC_EVENTS = [
+  {
+    id:"weiterbildung",
+    title:"Weiterbildungsmöglichkeit",
+    text:"Dir wird ein kompakter Kurs angeboten. Der kostet jetzt Geld, könnte sich später aber lohnen.",
+    can:g=>g.month >= 4 && !g.storyFlags.trainingDone,
+    run(g){
+      openChoiceModal({
+        title:"Weiterbildungsmöglichkeit",
+        text:"Was machst du?",
+        options:[
+          { label:"Kurs buchen", meta:"Jetzt teuer, später stärker.", impacts:impactPills({money:-280, stability:+1, comfort:-1, social:-1}), onPick:()=>{ g.storyFlags.trainingDone = true; g.balance -= 280; g.income += 180; timelineItem("Weiterbildung bezahlt", -280, "Das tut jetzt weh, kann sich aber künftig auszahlen."); timelineInfo("Neue Einkommensstufe", "+180 € Netto pro Monat ab jetzt."); setSceneNote(g, "Gerade eng, aber du investierst in dich."); finalizeMonth(g); } },
+          { label:"Ablehnen", meta:"Kein Extra-Risiko.", impacts:impactPills({money:0, stability:0, comfort:+1, social:0}), onPick:()=>{ timelineInfo("Weiterbildung vertagt", "Du gehst kein Risiko ein, verpasst aber vielleicht eine Chance."); finalizeMonth(g); } }
+        ]
+      });
+    }
+  },
+  {
+    id:"mieterhoehung",
+    title:"Mieterhöhung",
+    text:"Deine Wohnkosten steigen. Kein Weltuntergang, aber dauerhaft nervig.",
+    can:g=>g.month >= 5 && !g.storyFlags.rentRaised && !g.movedToWG && state.profile?.living !== "eltern",
+    run(g){
+      openChoiceModal({
+        title:"Mieterhöhung",
+        text:"Wie reagierst du?",
+        options:[
+          { label:"Zähne zusammenbeißen", meta:"Läuft weiter, aber teurer.", impacts:impactPills({money:0, stability:-2, comfort:-1, social:0}), onPick:()=>{ g.storyFlags.rentRaised = true; g.fixed.rent += 60; timelineInfo("Wohnkosten steigen", "+60 € Miete pro Monat ab jetzt."); setSceneNote(g, "Der Alltag wird enger, ohne dass sich sonst etwas verbessert."); finalizeMonth(g); } },
+          { label:"WG als Rettung", meta:"Einmal schlucken, dann günstiger wohnen.", impacts:impactPills({money:-220, stability:+2, comfort:-3, social:+2}), onPick:()=>{ g.storyFlags.rentRaised = true; if(!g.movedToWG && state.profile?.living !== "wg"){ g.balance -= 220; g.fixed.rent = LIVING.wg.rent; g.fixed.utilities = LIVING.wg.utilities; g.fixed.internet = LIVING.wg.internet; g.movedToWG = true; state.profile.living = "wg"; state.avatarData = buildAvatarFromProfile(state.profile); timelineItem("WG-Umzug", -220, "Umzug kostet, drückt aber deine laufenden Wohnkosten."); } finalizeMonth(g); } }
+        ]
+      });
+    }
+  },
+  {
+    id:"jobchance",
+    title:"Jobchance",
+    text:"Ein etwas besserer Job oder ein größerer Aufgabenbereich wäre drin. Mehr Geld, aber auch mehr Druck.",
+    can:g=>g.month >= 7 && !g.storyFlags.jobChanceTaken,
+    run(g){
+      openChoiceModal({
+        title:"Jobchance",
+        text:"Nimmst du die Chance an?",
+        options:[
+          { label:"Annehmen", meta:"Mehr Geld, weniger Leichtigkeit.", impacts:impactPills({money:0, stability:+3, comfort:-2, social:-2}), onPick:()=>{ g.storyFlags.jobChanceTaken = true; g.income += 220; g.comfort = clamp(g.comfort - 2, 0, 100); g.social = clamp(g.social - 2, 0, 100); timelineInfo("Neuer Joblevel", "+220 € Netto pro Monat. Dafür wird der Alltag etwas härter."); setSceneNote(g, "Karriereschritt geschafft – aber nicht gratis."); finalizeMonth(g); } },
+          { label:"Lieber lassen", meta:"Weniger Risiko, aber auch weniger Entwicklung.", impacts:impactPills({money:0, stability:0, comfort:+1, social:+1}), onPick:()=>{ timelineInfo("Chance abgelehnt", "Du entscheidest dich für Ruhe statt Extra-Druck."); finalizeMonth(g); } }
+        ]
+      });
+    }
+  },
+  {
+    id:"steuer",
+    title:"Steuererstattung",
+    text:"Überraschung: Es kommt etwas Geld zurück.",
+    can:g=>g.month >= 8 && !g.storyFlags.taxBack,
+    run(g){
+      g.storyFlags.taxBack = true;
+      g.balance += 190;
+      timelineItem("Steuererstattung", +190, "Ein seltener echter Push von außen.");
+      setSceneNote(g, "Ein ruhiger Moment: von außen kommt mal etwas zurück.");
+      finalizeMonth(g);
+    }
+  }
+];
+
 function calcMonthlyRate(amount, months, apr){
   if(amount <= 0) return 0;
   const r = (apr/100) / 12;
@@ -351,7 +324,7 @@ function newGame(profile){
   const life = lifestyleBudgets(profile);
   return {
     month: 1,
-    balance: 350,
+    balance: 650,
     income,
     dispoFloor: -500,
     fixed: {
@@ -371,31 +344,42 @@ function newGame(profile){
     insurance: { haftpflicht:true, hausrat:false, handy:false, rechtsschutz:false },
     insuranceHints: new Set(),
     loan: { active:false, principal:0, monthsLeft:0, rate:0, apr:0, type:"" },
-    plan: { cash:100, etf:100 },
+    plan: { cash:70, etf:20 },
     buckets: {
       cash: 0,
       etf: 0,
       subs: [
-        { id:"b1", name:"Urlaub", balance:0, plan:50 },
-        { id:"b2", name:"Puffer", balance:0, plan:50 },
+        { id:"b1", name:"Urlaub", balance:0, plan:30 },
+        { id:"b2", name:"Puffer", balance:0, plan:20 },
       ],
     },
     redMonths: 0,
-    stability: 55,
+    greenMonthsStreak: 0,
+    stability: 56,
     comfort: initialComfort(profile),
     social: initialSocial(profile),
-    historyBalance: [350],
+    historyBalance: [650],
     historyEtf: [0],
     hasRunThisMonth: false,
     lastReceipt: null,
+    effects: [],
+    sceneNote: "Monat startet ruhig. Noch ist alles offen.",
     sideJob: false,
     sideJobUsed: false,
     soldClothesCooldown: 0,
     movedToWG: profile.living === "wg",
     emergencyHelpUsed: false,
+    advisorHint: "",
     fixedActionsUsedThisMonth: 0,
-    actionsCollapsed: false,
-    advisorHint: ""
+    phaseKey: "survival",
+    phaseProgress: 0,
+    achievements: new Set(),
+    storyFlags: {
+      trainingDone: false,
+      rentRaised: false,
+      jobChanceTaken: false,
+      taxBack: false,
+    }
   };
 }
 
@@ -610,74 +594,31 @@ function renderBuckets(g){
   });
 }
 
-
-function resizeCanvasToDisplaySize(canvas, height){
-  const dpr = Math.max(1, window.devicePixelRatio || 1);
-  const rect = canvas.getBoundingClientRect();
-  const width = Math.max(240, Math.round(rect.width * dpr));
-  const targetHeight = Math.round(height * dpr);
-  if(canvas.width !== width || canvas.height !== targetHeight){
-    canvas.width = width;
-    canvas.height = targetHeight;
-  }
-  return { dpr, width: canvas.width, height: canvas.height };
-}
-
 function drawLineChart(canvas, values){
-  if(!canvas) return;
-  const { dpr, width, height } = resizeCanvasToDisplaySize(canvas, 140);
   const ctx = canvas.getContext("2d");
-  ctx.setTransform(1,0,0,1,0,0);
-  ctx.clearRect(0,0,width,height);
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0,0,w,h);
   if(!values || values.length < 2) return;
-
-  const isEtf = canvas.id === "chartEtf";
-  const stroke = isEtf ? "#4C6EDB" : "#3F8C63";
-  const glow = isEtf ? "rgba(76,110,219,.18)" : "rgba(63,140,99,.16)";
-  const grid = "rgba(52,45,39,.10)";
-  const text = "rgba(29,36,48,.72)";
-
-  const padL = 18 * dpr, padR = 12 * dpr, padT = 12 * dpr, padB = 18 * dpr;
   const min = Math.min(...values);
   const max = Math.max(...values);
+  const pad = 14;
+  ctx.globalAlpha = 0.5;
+  ctx.beginPath();
+  ctx.moveTo(pad, h-pad);
+  ctx.lineTo(w-pad, h-pad);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
   const normY = (v)=>{
-    if(max === min) return height/2;
+    if(max === min) return h/2;
     const t = (v - min) / (max - min);
-    return (height-padB) - t * (height - padT - padB);
+    return (h-pad) - t * (h - pad*2);
   };
-  const stepX = (width - padL - padR) / (values.length - 1);
-
-  ctx.strokeStyle = grid;
-  ctx.lineWidth = 1;
-  for(let i=0;i<4;i++){
-    const y = padT + ((height - padT - padB) / 3) * i;
-    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(width-padR, y); ctx.stroke();
-  }
-
-  ctx.strokeStyle = glow;
-  ctx.lineWidth = 8 * dpr/2;
+  const stepX = (w - pad*2) / (values.length - 1);
   ctx.beginPath();
-  ctx.moveTo(padL, normY(values[0]));
-  for(let i=1;i<values.length;i++) ctx.lineTo(padL + i*stepX, normY(values[i]));
+  ctx.moveTo(pad, normY(values[0]));
+  for(let i=1;i<values.length;i++) ctx.lineTo(pad + i*stepX, normY(values[i]));
   ctx.stroke();
-
-  ctx.strokeStyle = stroke;
-  ctx.lineWidth = 2.5 * dpr/2;
-  ctx.beginPath();
-  ctx.moveTo(padL, normY(values[0]));
-  for(let i=1;i<values.length;i++) ctx.lineTo(padL + i*stepX, normY(values[i]));
-  ctx.stroke();
-
-  const lastX = padL + (values.length-1)*stepX;
-  const lastY = normY(values[values.length-1]);
-  ctx.fillStyle = stroke;
-  ctx.beginPath(); ctx.arc(lastX, lastY, 3.5*dpr/2, 0, Math.PI*2); ctx.fill();
-
-  ctx.fillStyle = text;
-  ctx.font = `${10*dpr/2}px system-ui`;
-  ctx.fillText(formatEUR(values[values.length-1]), Math.max(padL, lastX - 58*dpr/2), Math.max(12*dpr/2, lastY - 8*dpr/2));
 }
-
 
 function renderCharts(g){
   drawLineChart(el("chartBalance"), g.historyBalance);
@@ -703,7 +644,6 @@ function renderStats(g){
   el("inpEtf").value = g.plan.etf;
   el("loanStatus").textContent = g.loan.active ? `Aktiv: ${LOAN_TYPES[g.loan.type]?.label ?? "Kredit"} • Rate ${formatEUR(g.loan.rate)}/Monat • noch ${g.loan.monthsLeft} Monate` : "kein Kredit";
   el("goalNote").innerHTML = `Minus-Monate: <strong>${g.redMonths}</strong> • Dispo-Limit: <strong>${formatEUR(g.dispoFloor)}</strong> • Stabilität <strong>${g.stability}</strong> • Komfort <strong>${g.comfort}</strong> • Soziales <strong>${g.social}</strong>.`;
-  if(el("advisorText")) el("advisorText").textContent = g.advisorHint || "Kleine Stellschrauben können einen Monat retten.";
 }
 
 function renderAll(){
@@ -822,6 +762,128 @@ function takeLoan(){
   renderAll();
 }
 
+
+// ---------- Action center ----------
+function toggleActionPanel(){
+  const body = el("actionBody");
+  const chev = el("actionChevron");
+  if(!body) return;
+  const open = !body.classList.contains("hidden");
+  body.classList.toggle("hidden", open);
+  if(chev) chev.textContent = open ? "▾" : "▴";
+}
+
+function actionUseGuard(limit = 2){
+  const g = state.game;
+  if(!g) return false;
+  if(g.hasRunThisMonth){ toast("Aktion", "Zwischen zwei Monatsstarts kannst du keine Sofortaktion mehr nutzen."); return false; }
+  if(g.fixedActionsUsedThisMonth >= limit){ toast("Aktion", "Diesen Monat hast du schon genug Sofortaktionen genutzt."); return false; }
+  return true;
+}
+
+function cancelSubscriptions(){
+  const g = state.game;
+  if(!actionUseGuard()) return;
+  if(g.variable.subs <= 0){ toast("Abos", "Du hast keine Abos mehr."); return; }
+  const saved = Math.min(18, g.variable.subs);
+  g.variable.subs = Math.max(0, g.variable.subs - saved);
+  g.fixedActionsUsedThisMonth += 1;
+  g.stability = clamp(g.stability + 2, 0, 100);
+  g.comfort = clamp(g.comfort - 1, 0, 100);
+  timelineItem("Abos gekündigt", +saved, "Du hast Verträge überprüft und laufende Kosten gesenkt.");
+  setSceneNote(g, "Weniger Bequemlichkeit, aber der Monat wird spürbar klarer.");
+  renderAll();
+}
+
+function sellClothes(){
+  const g = state.game;
+  if(!actionUseGuard()) return;
+  if(g.soldClothesCooldown > 0){ toast("Verkaufen", "Gerade hast du nichts Sinnvolles mehr zum Verkaufen."); return; }
+  const money = 95;
+  g.balance += money;
+  g.soldClothesCooldown = 3;
+  g.fixedActionsUsedThisMonth += 1;
+  g.comfort = clamp(g.comfort - 1, 0, 100);
+  timelineItem("Klamotten verkauft", +money, "Second-Hand Verkauf bringt kurzfristig Luft.");
+  renderAll();
+}
+
+function startSideJob(){
+  const g = state.game;
+  if(!actionUseGuard(1)) return;
+  if(g.sideJob || g.sideJobUsed){ toast("Nebenjob", "Du hast diese Option bereits genutzt."); return; }
+  g.sideJob = true;
+  g.sideJobUsed = true;
+  g.income += 150;
+  g.fixedActionsUsedThisMonth += 1;
+  g.comfort = clamp(g.comfort - 7, 0, 100);
+  g.social = clamp(g.social - 4, 0, 100);
+  addEffect(g,{ name:"Erschöpfung", months:3, comfort:-2, social:-1, text:"Mehr Geld, aber weniger Energie und Zeit." });
+  timelineInfo("Nebenjob gestartet", "Mehr Geld pro Monat, aber deutlich weniger Freizeit.");
+  renderAll();
+}
+
+function moveToWG(){
+  const g = state.game;
+  if(!actionUseGuard(1)) return;
+  if(g.movedToWG || state.profile?.living === "wg"){ toast("WG", "Du wohnst bereits in einer WG."); return; }
+  const moveCost = 240;
+  g.balance -= moveCost;
+  g.fixed.rent = LIVING.wg.rent;
+  g.fixed.utilities = LIVING.wg.utilities;
+  g.fixed.internet = LIVING.wg.internet;
+  g.movedToWG = true;
+  state.profile.living = "wg";
+  state.avatarData = buildAvatarFromProfile(state.profile);
+  g.fixedActionsUsedThisMonth += 1;
+  g.comfort = clamp(g.comfort - 4, 0, 100);
+  g.social = clamp(g.social + 2, 0, 100);
+  timelineItem("In WG gezogen", -moveCost, "Umzug kostet erst einmal Geld, senkt aber künftig die Wohnkosten.");
+  renderAll();
+}
+
+function refinanceLoan(){
+  const g = state.game;
+  if(!actionUseGuard()) return;
+  if(!g.loan.active){ toast("Kredit", "Kein Kredit aktiv."); return; }
+  const oldRate = g.loan.rate;
+  g.loan.apr = Math.max(2.5, g.loan.apr - 1.5);
+  g.loan.rate = calcMonthlyRate(g.loan.principal, Math.max(1, g.loan.monthsLeft), g.loan.apr);
+  g.fixedActionsUsedThisMonth += 1;
+  g.stability = clamp(g.stability + 3, 0, 100);
+  timelineItem("Kredit umgeschuldet", Math.round(oldRate - g.loan.rate), "Die Rate sinkt etwas. Nicht magisch, aber hilfreich.");
+  renderAll();
+}
+
+function emergencyHelp(){
+  const g = state.game;
+  if(!g) return;
+  if(g.emergencyHelpUsed){ toast("Hilfe", "Diese Hilfe gab es schon."); return; }
+  if(!(g.balance < 0 || g.redMonths >= 2)){ toast("Hilfe", "Diese Notfallhilfe gibt es erst, wenn es wirklich eng wird."); return; }
+  g.emergencyHelpUsed = true;
+  g.balance += 220;
+  g.stability = clamp(g.stability - 1, 0, 100);
+  timelineItem("Notfallhilfe", +220, "Familie oder Umfeld helfen einmal aus.");
+  renderAll();
+}
+
+function renderActionCenter(){
+  const g = state.game;
+  if(!g) return;
+  if(el("mqActionMeta")){
+    el("mqActionMeta").textContent = g.hasRunThisMonth
+      ? "Aktionen sind wieder vor dem nächsten Monatsstart verfügbar"
+      : `Aktionen vor Monat ${g.month} • genutzt: ${g.fixedActionsUsedThisMonth}/2`;
+  }
+  const setDisabled = (id, disabled) => { const btn = el(id); if(btn) btn.disabled = !!disabled; };
+  setDisabled("actCancelSubs", g.hasRunThisMonth || g.variable.subs <= 0 || g.fixedActionsUsedThisMonth >= 2);
+  setDisabled("actSellClothes", g.hasRunThisMonth || g.soldClothesCooldown > 0 || g.fixedActionsUsedThisMonth >= 2);
+  setDisabled("actSideJob", g.hasRunThisMonth || g.sideJob || g.sideJobUsed || g.fixedActionsUsedThisMonth >= 1);
+  setDisabled("actWG", g.hasRunThisMonth || g.movedToWG || state.profile?.living === "wg" || g.fixedActionsUsedThisMonth >= 1);
+  setDisabled("actRefi", g.hasRunThisMonth || !g.loan.active || g.fixedActionsUsedThisMonth >= 2);
+  setDisabled("actEmergency", g.hasRunThisMonth || !(g.balance < 0 || g.redMonths >= 2) || g.emergencyHelpUsed);
+}
+
 // ---------- Decisions / events ----------
 function impactPills({money=0, stability=0, comfort=0, social=0}){
   const mk = (cls,text)=>({cls,text});
@@ -838,6 +900,8 @@ function applyOption(g, opt, title){
   g.stability = clamp(g.stability + opt.stability, 0, 100);
   g.comfort = clamp(g.comfort + opt.comfort, 0, 100);
   g.social = clamp(g.social + opt.social, 0, 100);
+  if(opt.effect) addEffect(g, opt.effect);
+  if(opt.scene) setSceneNote(g, opt.scene);
   timelineItem(title, opt.money, `${opt.label}: ${opt.meta}`);
 }
 
@@ -845,20 +909,20 @@ const DECISIONS = [
   {
     title:"Essen & Trinken",
     text:"Du merkst: Essen kippt den Monat. Was machst du?",
-    a:{ label:"Meal Prep", meta:"Planen und vorkochen.", money:+70, stability:+6, comfort:-1, social:0 },
-    b:{ label:"To-Go / Lieferung", meta:"Bequemer, aber teurer.", money:-70, stability:-2, comfort:+2, social:+1 },
+    a:{ label:"Meal Prep", meta:"Planen und vorkochen.", money:+70, stability:+6, comfort:-1, social:0, effect:{ name:"Meal-Prep-Routine", months:2, money:+15, stability:+1, text:"Du kaufst geplanter ein und gibst etwas weniger aus." } },
+    b:{ label:"To-Go / Lieferung", meta:"Bequemer, aber teurer.", money:-70, stability:-2, comfort:+2, social:+1, effect:{ name:"Bequemlichkeitskosten", months:2, money:-20, stability:-1, text:"Spontane Bestellungen summieren sich weiter." } },
   },
   {
     title:"Freizeit",
     text:"Freunde fragen: Kino heute?",
-    a:{ label:"Mitgehen", meta:"Kostet, aber du bist dabei.", money:-25, stability:-1, comfort:+1, social:+6 },
-    b:{ label:"Absagen", meta:"Du sparst, bist aber weniger dabei.", money:+10, stability:+2, comfort:0, social:-4 },
+    a:{ label:"Mitgehen", meta:"Kostet, aber du bist dabei.", money:-25, stability:-1, comfort:+1, social:+6, effect:{ name:"Sozialer Rückenwind", months:1, social:+2, text:"Du fühlst dich noch im nächsten Monat etwas verbundener." } },
+    b:{ label:"Absagen", meta:"Du sparst, bist aber weniger dabei.", money:+10, stability:+2, comfort:0, social:-4, effect:{ name:"Rückzug", months:1, social:-2, text:"Weniger Teilhabe wirkt oft noch etwas nach." } },
   },
   {
     title:"Abos prüfen",
     text:"Du merkst: Abos summieren sich.",
-    a:{ label:"Kündigen", meta:"2 Abos weg.", money:+18, stability:+3, comfort:-2, social:-1 },
-    b:{ label:"Behalten", meta:"Bleibt bequem, kostet aber weiter.", money:0, stability:-1, comfort:+1, social:0 },
+    a:{ label:"Kündigen", meta:"2 Abos weg.", money:+18, stability:+3, comfort:-2, social:-1, effect:{ name:"Dauerhaft aufgeräumt", months:3, money:+12, stability:+1, text:"Weniger laufende Verträge entlasten auch die nächsten Monate." } },
+    b:{ label:"Behalten", meta:"Bleibt bequem, kostet aber weiter.", money:0, stability:-1, comfort:+1, social:0, effect:{ name:"Abo zieht weiter", months:3, money:-12, stability:-1, text:"Kleine Beträge nerven auch später." } },
   },
 ];
 
@@ -923,6 +987,8 @@ function runMonth(){
   if(g.hasRunThisMonth) return;
   timelineClear();
   timelineInfo(`Monat ${g.month} startet`, "Du siehst jetzt Schritt für Schritt, wo das Geld hingeht.");
+  if(g.soldClothesCooldown > 0) g.soldClothesCooldown -= 1;
+  processEffects(g);
   g.balance += g.income;
   timelineItem("Einkommen (Netto)", g.income, "Das ist dein Geld für diesen Monat.");
   const f = g.fixed;
@@ -969,7 +1035,7 @@ function runMonth(){
     const can = Math.max(0, g.balance);
     const factor = want > 0 ? Math.min(1, can / want) : 0;
     const payCash = Math.floor(g.plan.cash * factor);
-    const payEtf = Math.floor(g.plan.etf * factor);
+    const payEtf = Math.floor((g.buckets.cash < 300 ? Math.floor(g.plan.etf * 0.25) : g.plan.etf) * factor);
     let paidSubs = 0;
     for(const b of g.buckets.subs){
       const pay = Math.floor((b.plan || 0) * factor);
@@ -1004,8 +1070,22 @@ function runMonth(){
   el("btnRunMonth").disabled = true;
 }
 
+function maybePickEligible(arr, chance, g){
+  const eligible = arr.filter(ev => !ev.can || ev.can(g));
+  if(!eligible.length) return null;
+  if(Math.random() > chance) return null;
+  return eligible[Math.floor(Math.random() * eligible.length)];
+}
+
 function continueAfterDecision(g){
-  const ev = maybePick(EVENTS, 0.50);
+  const dramaticChance = (g.month <= 2 ? 0.05 : g.month <= 5 ? 0.14 : 0.22) + (g.stability < 40 ? 0.08 : 0);
+  const dramatic = maybePickEligible(DRAMATIC_EVENTS, dramaticChance, g);
+  if(dramatic){
+    openEventModal({ title: dramatic.title, text: dramatic.text, onOk: ()=> dramatic.run(g) });
+    return;
+  }
+  const normalChance = g.phaseKey === "survival" ? 0.42 : g.phaseKey === "stability" ? 0.34 : g.phaseKey === "safety" ? 0.26 : 0.22;
+  const ev = maybePick(EVENTS, normalChance);
   if(ev){
     openEventModal({ title: ev.title, text: ev.text, onOk: ()=> ev.after(g) });
     return;
@@ -1016,22 +1096,37 @@ function continueAfterDecision(g){
 function finalizeMonth(g){
   const mv = applyEtfMovement(g);
   timelineItem("ETF Bewegung", mv.change, `Monatsrendite: ${mv.pct>=0?"+":""}${mv.pct}%`);
+
   if(g.balance < 0){
     g.redMonths += 1;
+    g.greenMonthsStreak = 0;
     g.social = clamp(g.social - 2, 0, 100);
     g.comfort = clamp(g.comfort - 1, 0, 100);
-  } else {
+    setSceneNote(g, "Monatsende mit Druck: Konto angespannt, Stimmung kippt leicht.");
+  } else if(g.buckets.cash >= 800) {
+    g.redMonths = Math.max(0, g.redMonths - 1);
+    g.greenMonthsStreak += 1;
     g.social = clamp(g.social + 1, 0, 100);
+    setSceneNote(g, "Monatsende wirkt stabil. Rücklage gibt sichtbar Sicherheit.");
+  } else {
+    g.redMonths = Math.max(0, g.redMonths - 1);
+    g.greenMonthsStreak += 1;
+    g.social = clamp(g.social + 1, 0, 100);
+    setSceneNote(g, "Monatsende okay – nicht luxuriös, aber unter Kontrolle.");
   }
-  if(g.balance < 0){ g.redMonths += 0; }
-  g.historyBalance.push(g.balance);
-  g.historyEtf.push(g.buckets.etf);
+
   if(g.month % 3 === 0){
     g.variable.food += 10;
     g.variable.mobility += 5;
-    timelineInfo("Preisanstieg", "Einige Alltagskosten steigen leicht.");
+    timelineInfo("Preissteigerung", "Ein paar Alltagskosten ziehen leicht an.");
   }
-  el("btnNextMonth").disabled = false;
+
+  g.historyBalance.push(g.balance);
+  g.historyEtf.push(g.buckets.etf);
+
+  checkAchievements(g);
+
+  if(el("btnNextMonth")) el("btnNextMonth").disabled = false;
   renderAll();
   timelineInfo("Monat beendet", "Du kannst jetzt zum nächsten Monat wechseln.");
 }
@@ -1041,157 +1136,35 @@ function nextMonth(){
   if(!g.hasRunThisMonth) return;
   if(g.month >= 12){
     const wealth = g.balance + g.buckets.cash + g.buckets.etf + g.buckets.subs.reduce((s,b)=> s + b.balance, 0);
-    openEndModal("Auswertung", `Kontostand: ${formatEUR(g.balance)}\nNotgroschen: ${formatEUR(g.buckets.cash)}\nETF: ${formatEUR(g.buckets.etf)}\nUnterkonten: ${formatEUR(g.buckets.subs.reduce((s,b)=> s + b.balance, 0))}\n\nVermögen (vereinfacht): ${formatEUR(wealth)}\nMinus-Monate: ${g.redMonths}\nStabilität / Komfort / Soziales: ${g.stability} / ${g.comfort} / ${g.social}`);
+    const phase = LIFE_PHASES.find(p=>p.key === g.phaseKey)?.name || "—";
+    openEndModal("Auswertung", `Kontostand: ${formatEUR(g.balance)}
+Notgroschen: ${formatEUR(g.buckets.cash)}
+ETF: ${formatEUR(g.buckets.etf)}
+Unterkonten: ${formatEUR(g.buckets.subs.reduce((s,b)=> s + b.balance, 0))}
+
+Vermögen (vereinfacht): ${formatEUR(wealth)}
+Minus-Monate: ${g.redMonths}
+Stabilität / Komfort / Soziales: ${g.stability} / ${g.comfort} / ${g.social}
+Phase: ${phase}
+Achievements: ${g.achievements.size}/${ACHIEVEMENTS.length}`);
     return;
   }
   g.month += 1;
   g.hasRunThisMonth = false;
   g.fixedActionsUsedThisMonth = 0;
-  if(g.soldClothesCooldown > 0) g.soldClothesCooldown -= 1;
-  el("btnNextMonth").disabled = true;
+  if(el("btnNextMonth")) el("btnNextMonth").disabled = true;
   timelineClear();
   timelineInfo(`Monat ${g.month}`, "Bereit? Jetzt wieder Einkommen, Kosten und Entscheidungen.");
   renderAll();
 }
 
-
-
-function updateAdvisor(g){
-  const tips = [];
-  if(g.balance < 0) tips.push("Du bist im Minus. Prüfe direkt feste Optionen wie Abos, WG oder Nebenjob.");
-  if(g.variable.subs > 0) tips.push("Abos sind klein, aber nerven dauerhaft. Die sind oft der erste Hebel.");
-  if(g.buckets.cash < 300) tips.push("Frühes Spiel: Rücklage schlägt ETF.");
-  if(g.loan.active) tips.push("Läuft ein Kredit, kann Umschulden sinnvoll sein.");
-  if(g.balance > 250 && g.buckets.cash < 600) tips.push("Gerade ist etwas Luft da. Nutz sie eher für Puffer als für Luxus.");
-  g.advisorHint = tips[0] || "Gerade keine rote Warnung. Halte deinen Kurs.";
-}
-
-function actionUseGuard(limit = 2){
-  const g = state.game;
-  if(!g) return false;
-  if(g.hasRunThisMonth){ toast("Aktion", "Diese Sofortaktionen gehen nur vor dem Monatslauf."); return false; }
-  if(g.fixedActionsUsedThisMonth >= limit){ toast("Aktion", "Diesen Monat hast du schon genug Sofortaktionen genutzt."); return false; }
-  return true;
-}
-
-function cancelSubscriptions(){
-  const g = state.game;
-  if(!actionUseGuard()) return;
-  if(g.variable.subs <= 0){ toast("Abos", "Du hast keine Abos mehr."); return; }
-  const saved = Math.min(18, g.variable.subs);
-  g.variable.subs = Math.max(0, g.variable.subs - saved);
-  g.fixedActionsUsedThisMonth += 1;
-  g.stability = clamp(g.stability + 2, 0, 100);
-  g.comfort = clamp(g.comfort - 1, 0, 100);
-  timelineItem("Abos gekündigt", +saved, "Weniger laufende Kosten – etwas weniger Komfort.");
-  renderAll();
-}
-
-function sellClothes(){
-  const g = state.game;
-  if(!actionUseGuard()) return;
-  if(g.soldClothesCooldown > 0){ toast("Verkaufen", "Gerade hast du nichts Sinnvolles mehr zum Verkaufen."); return; }
-  const money = 100;
-  g.balance += money;
-  g.soldClothesCooldown = 2;
-  g.fixedActionsUsedThisMonth += 1;
-  g.comfort = clamp(g.comfort - 1, 0, 100);
-  timelineItem("Klamotten verkauft", +money, "Second-Hand bringt kurzfristig Luft.");
-  renderAll();
-}
-
-function startSideJob(){
-  const g = state.game;
-  if(!actionUseGuard(1)) return;
-  if(g.sideJob || g.sideJobUsed){ toast("Nebenjob", "Diese Option hast du schon genutzt."); return; }
-  g.sideJob = true;
-  g.sideJobUsed = true;
-  g.income += 150;
-  g.fixedActionsUsedThisMonth += 1;
-  g.comfort = clamp(g.comfort - 4, 0, 100);
-  g.social = clamp(g.social - 2, 0, 100);
-  timelineInfo("Nebenjob gestartet", "Mehr Geld pro Monat, aber weniger Freizeit und Energie.");
-  renderAll();
-}
-
-function moveToWG(){
-  const g = state.game;
-  if(!actionUseGuard(1)) return;
-  if(g.movedToWG || state.profile?.living === "wg"){ toast("WG", "Du wohnst bereits in einer WG."); return; }
-  const old = g.fixed.rent + g.fixed.utilities + g.fixed.internet;
-  const newer = LIVING.wg.rent + LIVING.wg.utilities + LIVING.wg.internet;
-  const moveCost = 180;
-  g.balance -= moveCost;
-  g.fixed.rent = LIVING.wg.rent;
-  g.fixed.utilities = LIVING.wg.utilities;
-  g.fixed.internet = LIVING.wg.internet;
-  g.movedToWG = true;
-  state.profile.living = "wg";
-  syncAvatarFromProfile(state.profile);
-  g.fixedActionsUsedThisMonth += 1;
-  g.comfort = clamp(g.comfort - 3, 0, 100);
-  g.social = clamp(g.social + 2, 0, 100);
-  timelineItem("In WG gezogen", old - newer - moveCost, `Wohnkosten sinken, aber der Umzug kostet erstmal ${formatEUR(moveCost)}.`);
-  renderAll();
-}
-
-function refinanceLoan(){
-  const g = state.game;
-  if(!actionUseGuard()) return;
-  if(!g.loan.active){ toast("Kredit", "Kein Kredit aktiv."); return; }
-  const oldRate = g.loan.rate;
-  g.loan.apr = Math.max(2.5, g.loan.apr - 1.5);
-  g.loan.rate = calcMonthlyRate(g.loan.principal, Math.max(1, g.loan.monthsLeft), g.loan.apr);
-  g.fixedActionsUsedThisMonth += 1;
-  g.stability = clamp(g.stability + 3, 0, 100);
-  timelineItem("Kredit umgeschuldet", Math.round(oldRate - g.loan.rate), "Die Rate sinkt etwas. Nicht magisch, aber hilfreich.");
-  renderAll();
-}
-
-function emergencyHelp(){
-  const g = state.game;
-  if(g.emergencyHelpUsed){ toast("Hilfe", "Diese Hilfe gab es schon."); return; }
-  if(!(g.balance < 0 || g.redMonths >= 2)){ toast("Hilfe", "Noch nicht freigeschaltet. Erst wenn es wirklich brennt."); return; }
-  g.emergencyHelpUsed = true;
-  g.balance += 220;
-  g.stability = clamp(g.stability - 1, 0, 100);
-  timelineItem("Notfallhilfe", +220, "Familie / Umfeld hilft einmal aus.");
-  renderAll();
-}
-
-function toggleActionCenter(){
-  const root = el("actionCenter");
-  if(!root || !state.game) return;
-  state.game.actionsCollapsed = !state.game.actionsCollapsed;
-  renderActionCenter();
-}
-
-function renderActionCenter(){
-  const g = state.game;
-  const root = el("actionCenter");
-  if(!root || !g) return;
-  root.classList.toggle("is-collapsed", !!g.actionsCollapsed);
-  const toggleBtn = el("btnToggleActions");
-  if(toggleBtn) toggleBtn.setAttribute("aria-expanded", String(!g.actionsCollapsed));
-  if(el("actCancelSubs")) el("actCancelSubs").disabled = g.variable.subs <= 0 || g.hasRunThisMonth;
-  if(el("actSellClothes")) el("actSellClothes").disabled = g.soldClothesCooldown > 0 || g.hasRunThisMonth;
-  if(el("actSideJob")) el("actSideJob").disabled = g.sideJob || g.sideJobUsed || g.hasRunThisMonth;
-  if(el("actWG")) el("actWG").disabled = g.movedToWG || g.hasRunThisMonth;
-  if(el("actRefi")) el("actRefi").disabled = !g.loan.active || g.hasRunThisMonth;
-  if(el("actEmergency")) el("actEmergency").disabled = g.emergencyHelpUsed || (!(g.balance < 0 || g.redMonths >= 2));
-  if(el("actionMeta")){
-    const left = Math.max(0, 2 - g.fixedActionsUsedThisMonth);
-    el("actionMeta").textContent = `Sofortaktionen übrig: ${left} • Kleidung-Cooldown: ${g.soldClothesCooldown} Monat(e)`;
-  }
-}
 // ---------- Glossary ----------
 function showGlossary(){
   el("glossaryContent").innerHTML = `
     <div class="gItem"><div class="gTitle">Notgroschen</div><div class="gText">Rücklage für Notfälle wie kaputte Waschmaschine, Handy oder Jobverlust.</div><div class="gSmall">Idee: Erst Rücklage, dann größere Extras.</div></div>
     <div class="gItem"><div class="gTitle">ETF</div><div class="gText">Eine Form von langfristigem Investieren. Der Wert kann steigen oder fallen.</div><div class="gSmall">Im Spiel siehst du diese Schwankung jeden Monat.</div></div>
     <div class="gItem"><div class="gTitle">Dispo</div><div class="gText">Du bist im Minus auf dem Konto. Das ist oft teuer.</div><div class="gSmall">Im Spiel gibt es deshalb ein Dispo-Limit.</div></div>
-    <div class="gItem"><div class="gTitle">Fixkosten</div><div class="gText">Kosten, die fast jeden Monat wiederkommen, zum Beispiel Miete oder Internet.</div><div class="gSmall">Die sollte man zuerst im Blick haben.</div></div>
-  `;
+    <div class="gItem"><div class="gTitle">Fixkosten</div><div class="gText">Kosten, die fast jeden Monat wiederkommen, zum Beispiel Miete oder Internet.</div><div class="gSmall">Die sollte man zuerst im Blick haben.</div></div>`;
   el("glossaryDrawer").classList.remove("hidden");
   el("glossaryDrawer").setAttribute("aria-hidden", "false");
 }
@@ -1203,9 +1176,6 @@ function closeGlossary(){
 
 // ---------- Tooltips ----------
 function bindTooltips(){
-  document.querySelectorAll('.tip').forEach(btn => {
-    if(btn.dataset.tip) btn.setAttribute("title", btn.dataset.tip);
-  });
   document.querySelectorAll('.tipBtn').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.preventDefault();
@@ -1215,6 +1185,12 @@ function bindTooltips(){
       const isOpen = box.classList.contains('is-open');
       document.querySelectorAll('.tipBox.is-open').forEach(x => x.classList.remove('is-open'));
       if(!isOpen) box.classList.add('is-open');
+    });
+  });
+  document.querySelectorAll('.tip[data-tip]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      toast('Info', btn.getAttribute('data-tip') || '');
     });
   });
   document.addEventListener('click', () => {
@@ -1232,7 +1208,8 @@ function setView(view){
 function startGame(){
   const profile = readProfile();
   state.profile = profile;
-  syncAvatarFromProfile(profile);
+  avatarSalt = 0;
+  state.avatarData = buildAvatarFromProfile(profile);
   state.game = newGame(profile);
   setView("game");
   timelineClear();
@@ -1244,37 +1221,36 @@ function startGame(){
 function bindInterviewLive(){
   ["path","field","living","family","style","lifeFood","lifeFun","lifeShop","lifeSubs","lifeMobility"].forEach(id => {
     const node = el(id);
+    if(!node) return;
     node.addEventListener("change", updateInterviewPreview);
     node.addEventListener("input", updateInterviewPreview);
   });
 }
 
 function bind(){
-  el("btnGlossaryTop").addEventListener("click", showGlossary);
-  el("btnCloseGlossary").addEventListener("click", closeGlossary);
-  el("btnResetTop").addEventListener("click", ()=> location.reload());
-  el("regen").addEventListener("click", regenAvatar);
-  el("reset").addEventListener("click", ()=> location.reload());
-  el("start").addEventListener("click", startGame);
-  el("btnRunMonth").addEventListener("click", runMonth);
-  el("btnNextMonth").addEventListener("click", nextMonth);
-  el("btnApplyPlan").addEventListener("click", applyPlan);
-  el("btnAddBucket").addEventListener("click", addBucket);
-  el("btnWithdrawCash").addEventListener("click", withdrawFromCash);
-  el("btnSellEtf").addEventListener("click", sellEtf);
-  el("btnTakeLoan").addEventListener("click", takeLoan);
-  el("btnToggleActions")?.addEventListener("click", toggleActionCenter);
+  el("btnGlossaryTop")?.addEventListener("click", showGlossary);
+  el("btnCloseGlossary")?.addEventListener("click", closeGlossary);
+  el("btnResetTop")?.addEventListener("click", ()=> location.reload());
+  el("regen")?.addEventListener("click", regenAvatar);
+  el("reset")?.addEventListener("click", ()=> location.reload());
+  el("start")?.addEventListener("click", startGame);
+  el("btnRunMonth")?.addEventListener("click", runMonth);
+  el("btnNextMonth")?.addEventListener("click", nextMonth);
+  el("btnApplyPlan")?.addEventListener("click", applyPlan);
+  el("btnAddBucket")?.addEventListener("click", addBucket);
+  el("btnWithdrawCash")?.addEventListener("click", withdrawFromCash);
+  el("btnSellEtf")?.addEventListener("click", sellEtf);
+  el("btnTakeLoan")?.addEventListener("click", takeLoan);
+  el("actionToggle")?.addEventListener("click", toggleActionPanel);
   el("actCancelSubs")?.addEventListener("click", cancelSubscriptions);
   el("actSellClothes")?.addEventListener("click", sellClothes);
   el("actSideJob")?.addEventListener("click", startSideJob);
   el("actWG")?.addEventListener("click", moveToWG);
   el("actRefi")?.addEventListener("click", refinanceLoan);
   el("actEmergency")?.addEventListener("click", emergencyHelp);
-  window.addEventListener("resize", ()=> state.game && renderCharts(state.game));
   bindInterviewLive();
   bindTooltips();
   updateInterviewPreview();
-  if(!state.avatarData) syncAvatarFromProfile(readProfile());
   renderAvatarPreview();
 }
 
