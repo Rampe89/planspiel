@@ -1283,7 +1283,6 @@ const EVENTS = [
       });
     }
   },
-  },
   {
     id:"prescription",
     title:"Apotheke & Gesundheit",
