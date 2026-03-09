@@ -575,6 +575,8 @@ function newGame(profile){
     greenMonthsStreak: 0,
     phaseKey: "survival",
     achievements: new Set(),
+    recentDecisions: [],
+    recentEvents: [],
     storyFlags: { trainingDone:false, rentRaised:false, jobChanceTaken:false, taxBack:false }
   };
 }
@@ -1130,60 +1132,239 @@ function applyOption(g, opt, title){
 
 const DECISIONS = [
   {
-    title:"Essen & Trinken",
-    text:"Du merkst: Essen kippt den Monat. Was machst du?",
-    a:{ label:"Meal Prep", meta:"Planen und vorkochen.", money:+70, stability:+6, comfort:-1, social:0 },
-    b:{ label:"To-Go / Lieferung", meta:"Bequemer, aber teurer.", money:-70, stability:-2, comfort:+2, social:+1 },
+    id:"groceries",
+    title:"Wocheneinkauf",
+    text:"Beim Einkaufen merkst du: Mit Planung wird es deutlich günstiger als mit vielen kleinen Spontankäufen.",
+    weight:g=> g.variable.food >= 280 ? 4 : 2,
+    a:{ label:"Mit Liste einkaufen", meta:"Weniger Impulskäufe, etwas mehr Planung.", money:+45, stability:+4, comfort:-1, social:0, effect:{ name:"Geplanter Einkauf", months:1, money:+10, stability:+1, text:"Du hast einen Teil der Woche besser im Griff." }, scene:"Alltag wirkt sortierter. Kein Glamour, aber spürbar vernünftiger." },
+    b:{ label:"Zwischendurch holen", meta:"Bequemer, aber teurer.", money:-35, stability:-2, comfort:+1, social:0, effect:{ name:"Spontane Kleinkäufe", months:1, money:-10, stability:-1, text:"Viele kleine Beträge läppern sich." }, scene:"Nicht dramatisch – aber genau so rutscht Geld oft weg." }
   },
   {
-    title:"Freizeit",
-    text:"Freunde fragen: Kino heute?",
-    a:{ label:"Mitgehen", meta:"Kostet, aber du bist dabei.", money:-25, stability:-1, comfort:+1, social:+6 },
-    b:{ label:"Absagen", meta:"Du sparst, bist aber weniger dabei.", money:+10, stability:+2, comfort:0, social:-4 },
+    id:"lunch",
+    title:"Mittag unterwegs",
+    text:"Du bist unterwegs und hast Hunger. Nimmst du etwas von zu Hause mit oder kaufst du spontan?",
+    weight:g=> g.month <= 6 ? 3 : 2,
+    a:{ label:"Snack von zu Hause", meta:"Kleiner Aufwand, günstiger.", money:+18, stability:+2, comfort:-1, social:0, scene:"Kleinigkeit gespart – unspektakulär, aber genau das hilft auf Dauer." },
+    b:{ label:"Schnell etwas kaufen", meta:"Einfach, aber deutlich teurer.", money:-18, stability:-1, comfort:+1, social:0, scene:"Praktisch – und wieder ein kleiner Betrag weg." }
   },
   {
-    title:"Abos prüfen",
-    text:"Du merkst: Abos summieren sich.",
-    a:{ label:"Kündigen", meta:"2 Abos weg.", money:+18, stability:+3, comfort:-2, social:-1 },
-    b:{ label:"Behalten", meta:"Bleibt bequem, kostet aber weiter.", money:0, stability:-1, comfort:+1, social:0 },
+    id:"freizeit",
+    title:"Wochenende mit Freunden",
+    text:"Freunde fragen, ob du am Wochenende mitkommst. Es wäre schön – aber eben nicht gratis.",
+    weight:g=> g.social < 55 ? 4 : 3,
+    a:{ label:"Mitgehen", meta:"Kostet etwas, tut sozial aber gut.", money:-28, stability:-1, comfort:+1, social:+6, effect:{ name:"Sozialer Rückenwind", months:1, social:+2, text:"Du fühlst dich noch etwas verbundener." }, scene:"Teurer Abend, aber sozial ein echter Pluspunkt." },
+    b:{ label:"Diesmal absagen", meta:"Spart Geld, ist aber schade.", money:+10, stability:+2, comfort:0, social:-4, effect:{ name:"Rückzug", months:1, social:-2, text:"Weniger Teilhabe wirkt oft noch kurz nach." }, scene:"Finanziell vernünftig, emotional eher dünn." }
   },
+  {
+    id:"subscriptions",
+    title:"Verträge & Abos",
+    text:"Beim Blick aufs Konto fällt dir auf, dass mehrere kleine Abbuchungen unnötig nerven.",
+    weight:g=> g.variable.subs > 0 ? 4 : 1,
+    can:g=> g.variable.subs > 0,
+    a:{ label:"Etwas kündigen", meta:"Weniger Komfort, mehr Überblick.", money:+18, stability:+3, comfort:-2, social:-1, effect:{ name:"Dauerhaft aufgeräumt", months:3, money:+12, stability:+1, text:"Weniger laufende Verträge entlasten auch die nächsten Monate." }, scene:"Weniger Komfort, aber deutlich klarerer Monatsplan." },
+    b:{ label:"Weiterlaufen lassen", meta:"Bequem, aber dauerhaft teuer.", money:0, stability:-1, comfort:+1, social:0, effect:{ name:"Abo zieht weiter", months:3, money:-12, stability:-1, text:"Kleine Beträge nerven auch später." }, scene:"Es bleibt bequem – und dauerhaft etwas enger." }
+  },
+  {
+    id:"commute",
+    title:"Arbeitsweg",
+    text:"Du überlegst, ob du den Alltag etwas bequemer machst oder beim günstigeren Weg bleibst.",
+    weight:g=> g.variable.mobility >= 69 ? 2 : 1,
+    a:{ label:"Praktischer fahren", meta:"Weniger Stress, etwas teurer.", money:-15, stability:0, comfort:+3, social:0, scene:"Der Alltag läuft glatter, aber eben nicht gratis." },
+    b:{ label:"Günstig bleiben", meta:"Mehr Disziplin, weniger Komfort.", money:+10, stability:+2, comfort:-2, social:0, scene:"Nicht bequem, aber genau so entstehen Puffer." }
+  },
+  {
+    id:"shopping",
+    title:"Spontankauf",
+    text:"Du siehst etwas, das du eigentlich nicht brauchst, aber gerade trotzdem gern hättest.",
+    weight:g=> g.variable.shop >= 75 ? 3 : 1,
+    a:{ label:"Nicht kaufen", meta:"Kurz vernünftig sein.", money:+20, stability:+2, comfort:0, social:0, scene:"Kein Kick, aber ein klarer Sieg für dein Budget." },
+    b:{ label:"Gönnen", meta:"Kurz nice, später egal.", money:-45, stability:-2, comfort:+2, social:+1, scene:"Fühlt sich kurz gut an – und ist genau die Art Ausgabe, die schwer auffällt." }
+  },
+  {
+    id:"energy",
+    title:"Strom & Heizung",
+    text:"Du merkst, dass kleine Gewohnheiten im Alltag die Nebenkosten beeinflussen.",
+    weight:g=> g.fixed.utilities >= 110 ? 2 : 1,
+    a:{ label:"Bewusster werden", meta:"Etwas nerviger, aber sinnvoll.", money:+12, stability:+2, comfort:-1, social:0, effect:{ name:"Sparsamer Alltag", months:2, money:+6, text:"Kleine Gewohnheiten drücken die Kosten leicht." }, scene:"Nicht spektakulär, aber genau solche Details machen einen Unterschied." },
+    b:{ label:"Laufen lassen", meta:"Bequemer, aber teurer.", money:-8, stability:-1, comfort:+1, social:0, scene:"Bequem – und wieder etwas Luft verschenkt." }
+  },
+  {
+    id:"health",
+    title:"Körper & Pause",
+    text:"Du merkst, dass du eigentlich mal eine ruhigere Woche oder etwas für dich bräuchtest.",
+    weight:g=> g.comfort < 50 ? 3 : 1,
+    a:{ label:"Etwas für dich tun", meta:"Kleiner Betrag, aber tut gut.", money:-20, stability:+1, comfort:+3, social:0, scene:"Nicht direkt finanziell clever – aber manchmal trotzdem die bessere Entscheidung." },
+    b:{ label:"Weiter durchziehen", meta:"Spart Geld, zehrt aber.", money:+5, stability:0, comfort:-2, social:0, scene:"Billiger – aber du merkst, dass Energie auch ein Faktor ist." }
+  }
 ];
 
 const EVENTS = [
   {
+    id:"phone_break",
     title:"Handy kaputt",
-    text:"Dein Handy fällt runter. Das musst du jetzt beachten.",
+    text:"Dein Handy fällt runter. So etwas passt nie in den Monat.",
+    weight:g=> 1,
     after(g){
       g.insuranceHints.add("Handy: Eine Versicherung kann helfen, ist aber nicht immer automatisch sinnvoll.");
       openChoiceModal({
         title:"Handy kaputt",
         text:"Was machst du?",
         options:[
-          { label:"Reparieren", meta:"Billiger, aber nicht perfekt.", impacts:impactPills({money:-120, stability:-1, comfort:-1, social:-1}), onPick:()=>{ applyOption(g, {label:"Reparieren", meta:"Billiger.", money:-120, stability:-1, comfort:-1, social:-1}, "Ereignis"); finalizeMonth(g); } },
-          { label:"Neu kaufen", meta:"Teurer, aber bequemer.", impacts:impactPills({money:-420, stability:-2, comfort:+2, social:+2}), onPick:()=>{ applyOption(g, {label:"Neu kaufen", meta:"Teurer.", money:-420, stability:-2, comfort:+2, social:+2}, "Ereignis"); finalizeMonth(g); } }
+          { label:"Reparieren", meta:"Billiger, aber nicht perfekt.", impacts:impactPills({money:-120, stability:-1, comfort:-1, social:-1}), onPick:()=>{ applyOption(g, {label:"Reparieren", meta:"Billiger.", money:-120, stability:-1, comfort:-1, social:-1, effect:{ name:"Wackeliges Handy", months:2, comfort:-1, text:"Das reparierte Handy nervt noch etwas nach." }, scene:"Gerettet, aber nicht wirklich elegant."}, "Ereignis"); rememberRecent(g.recentEvents, "phone_break"); finalizeMonth(g); } },
+          { label:"Neu kaufen", meta:"Teurer, aber entspannter.", impacts:impactPills({money:-420, stability:-2, comfort:+2, social:+1}), onPick:()=>{ applyOption(g, {label:"Neu kaufen", meta:"Teurer.", money:-420, stability:-2, comfort:+2, social:+1, effect:{ name:"Große Anschaffung", months:1, stability:-1, text:"Große Anschaffungen drücken oft noch kurz nach." }, scene:"Technisch entspannt, finanziell aber ein echter Schlag."}, "Ereignis"); rememberRecent(g.recentEvents, "phone_break"); finalizeMonth(g); } }
         ]
       });
     }
   },
   {
-    title:"Bonus",
-    text:"Du bekommst einen kleinen Bonus.",
+    id:"prescription",
+    title:"Apotheke & Gesundheit",
+    text:"Du brauchst etwas aus der Apotheke oder musst zuzahlen. Nicht riesig, aber es kommt ungelegen.",
+    weight:g=> 2,
     after(g){
       openChoiceModal({
-        title:"Bonus",
-        text:"Was machst du mit dem Extra-Geld?",
+        title:"Apotheke & Gesundheit",
+        text:"Wie gehst du damit um?",
         options:[
-          { label:"Einfach behalten", meta:"Mehr Luft auf dem Konto.", impacts:impactPills({money:+120, stability:+2, comfort:+1, social:+1}), onPick:()=>{ applyOption(g, {label:"Behalten", meta:"Mehr Luft.", money:+120, stability:+2, comfort:+1, social:+1}, "Ereignis"); finalizeMonth(g); } },
-          { label:"Teil sparen", meta:"Etwas direkt in den Notgroschen.", impacts:impactPills({money:+120, stability:+3, comfort:0, social:0}), onPick:()=>{ applyOption(g, {label:"Teil sparen", meta:"Du legst direkt was weg.", money:+120, stability:+3, comfort:0, social:0}, "Ereignis"); g.buckets.cash += 80; g.balance -= 80; timelineItem("Bonus → Notgroschen", -80, "Direkt Rücklage erhöht."); finalizeMonth(g); } }
+          { label:"Direkt kaufen", meta:"Vernünftig, aber kostet.", impacts:impactPills({money:-28, stability:+1, comfort:+1, social:0}), onPick:()=>{ applyOption(g, {label:"Direkt kaufen", meta:"Nicht schön, aber sinnvoll.", money:-28, stability:+1, comfort:+1, social:0, scene:"Gesundheit ist selten optional – auch wenn es gerade nervt."}, "Ereignis"); rememberRecent(g.recentEvents, "prescription"); finalizeMonth(g); } },
+          { label:"Noch etwas schieben", meta:"Spart kurz Geld, fühlt sich aber nicht gut an.", impacts:impactPills({money:+0, stability:-1, comfort:-2, social:0}), onPick:()=>{ applyOption(g, {label:"Verschieben", meta:"Kurz gespart.", money:0, stability:-1, comfort:-2, social:0, scene:"Nicht jede Ersparnis fühlt sich am Ende gut an."}, "Ereignis"); rememberRecent(g.recentEvents, "prescription"); finalizeMonth(g); } }
         ]
       });
+    }
+  },
+  {
+    id:"gift",
+    title:"Geschenk / Sammeln",
+    text:"Im Umfeld steht ein Geburtstag, Abschied oder gemeinsames Geschenk an.",
+    weight:g=> 2,
+    after(g){
+      openChoiceModal({
+        title:"Geschenk / Sammeln",
+        text:"Wie viel gibst du?",
+        options:[
+          { label:"Kleiner Beitrag", meta:"Du bist dabei, aber bleibst im Rahmen.", impacts:impactPills({money:-12, stability:0, comfort:0, social:+2}), onPick:()=>{ applyOption(g, {label:"Kleiner Beitrag", meta:"Fair und machbar.", money:-12, stability:0, comfort:0, social:+2, scene:"Nicht viel Geld – aber sozial wichtig."}, "Ereignis"); rememberRecent(g.recentEvents, "gift"); finalizeMonth(g); } },
+          { label:"Mehr geben", meta:"Großzügiger, aber enger für dich.", impacts:impactPills({money:-30, stability:-1, comfort:0, social:+4}), onPick:()=>{ applyOption(g, {label:"Mehr geben", meta:"Großzügig.", money:-30, stability:-1, comfort:0, social:+4, scene:"Schön für die Gruppe – für dein Konto weniger."}, "Ereignis"); rememberRecent(g.recentEvents, "gift"); finalizeMonth(g); } }
+        ]
+      });
+    }
+  },
+  {
+    id:"utility_surcharge",
+    title:"Nachzahlung",
+    text:"Eine Nachzahlung oder eine unerwartete Abbuchung trifft den Monat.",
+    weight:g=> g.month >= 3 ? 2 : 1,
+    after(g){
+      applyOption(g, {label:"Nachzahlung", meta:"Leider sofort fällig.", money:-85, stability:-2, comfort:-1, social:0, scene:"Kein Drama, aber genau solche Dinge nerven echte Budgets."}, "Ereignis");
+      rememberRecent(g.recentEvents, "utility_surcharge");
+      finalizeMonth(g);
+    }
+  },
+  {
+    id:"bike_repair",
+    title:"Fahrrad reparieren",
+    text:"Dein Fahrrad braucht eine kleine Reparatur.",
+    can:g=> state.profile?.lifeMobility === "bike",
+    weight:g=> 3,
+    after(g){
+      applyOption(g, {label:"Reparatur", meta:"Nervig, aber nötig.", money:-45, stability:-1, comfort:-1, social:0, scene:"Bei günstiger Mobilität ist genau das der Haken: manchmal steckt Geld in Reparaturen."}, "Ereignis");
+      rememberRecent(g.recentEvents, "bike_repair");
+      finalizeMonth(g);
+    }
+  },
+  {
+    id:"car_cost",
+    title:"Auto kostet wieder",
+    text:"Beim Auto kommt etwas dazu: kleine Reparatur, Versicherung oder Werkstattkram.",
+    can:g=> state.profile?.lifeMobility === "car",
+    weight:g=> 4,
+    after(g){
+      openChoiceModal({
+        title:"Auto kostet wieder",
+        text:"Wie gehst du damit um?",
+        options:[
+          { label:"Direkt machen lassen", meta:"Teuer, aber safe.", impacts:impactPills({money:-160, stability:-1, comfort:+1, social:0}), onPick:()=>{ applyOption(g, {label:"Werkstatt", meta:"Direkt gelöst.", money:-160, stability:-1, comfort:+1, social:0, scene:"Genau deshalb ist ein Auto oft teuer, obwohl es bequem ist."}, "Ereignis"); rememberRecent(g.recentEvents, "car_cost"); finalizeMonth(g); } },
+          { label:"Nur das Nötigste", meta:"Etwas günstiger, aber nicht ideal.", impacts:impactPills({money:-95, stability:-1, comfort:-1, social:0}), onPick:()=>{ applyOption(g, {label:"Nötigste", meta:"Kurzfristig günstiger.", money:-95, stability:-1, comfort:-1, social:0, scene:"Du rettest den Monat etwas, aber nicht komplett entspannt."}, "Ereignis"); rememberRecent(g.recentEvents, "car_cost"); finalizeMonth(g); } }
+        ]
+      });
+    }
+  },
+  {
+    id:"quiet_month",
+    title:"Ruhiger Monat",
+    text:"Ausnahmsweise passiert nichts Besonderes. Das ist fast schon ein Geschenk.",
+    weight:g=> 1,
+    after(g){
+      applyOption(g, {label:"Ruhiger Monat", meta:"Keine Sonderbelastung.", money:0, stability:+2, comfort:+1, social:+1, scene:"Genau solche Monate braucht man, um wieder Luft zu bekommen."}, "Ereignis");
+      rememberRecent(g.recentEvents, "quiet_month");
+      finalizeMonth(g);
+    }
+  },
+  {
+    id:"refund",
+    title:"Rückerstattung",
+    text:"Eine kleine Rückerstattung oder Gutschrift landet auf deinem Konto.",
+    weight:g=> 0.6,
+    after(g){
+      openChoiceModal({
+        title:"Rückerstattung",
+        text:"Mit dem kleinen Extra lässt sich sinnvoll etwas machen.",
+        options:[
+          { label:"Auf dem Konto lassen", meta:"Einfach etwas mehr Luft.", impacts:impactPills({money:+65, stability:+1, comfort:+1, social:0}), onPick:()=>{ applyOption(g, {label:"Behalten", meta:"Mehr Luft.", money:+65, stability:+1, comfort:+1, social:0, scene:"Nicht spektakulär, aber gerade deshalb angenehm."}, "Ereignis"); rememberRecent(g.recentEvents, "refund"); finalizeMonth(g); } },
+          { label:"Direkt zurücklegen", meta:"Unaufgeregt vernünftig.", impacts:impactPills({money:+65, stability:+2, comfort:0, social:0}), onPick:()=>{ applyOption(g, {label:"Zurücklegen", meta:"Direkt gesichert.", money:+65, stability:+2, comfort:0, social:0, scene:"Kleine Beträge bewusst sichern ist oft stärker, als man denkt."}, "Ereignis"); g.buckets.cash += 50; g.balance -= 50; timelineItem("Rückerstattung → Notgroschen", -50, "Direkt Rücklage erhöht."); rememberRecent(g.recentEvents, "refund"); finalizeMonth(g); } }
+        ]
+      });
+    }
+  },
+  {
+    id:"overtime",
+    title:"Überstunden / Extra-Schicht",
+    text:"Du bekommst überraschend etwas zusätzlich ausgezahlt.",
+    weight:g=> 0.5,
+    after(g){
+      applyOption(g, {label:"Extra-Auszahlung", meta:"Mal etwas Positives.", money:+90, stability:+2, comfort:-1, social:0, scene:"Schön – aber eher Ausnahme als Regel."}, "Ereignis");
+      rememberRecent(g.recentEvents, "overtime");
+      finalizeMonth(g);
     }
   }
 ];
 
-function maybePick(arr, chance){
+function rememberRecent(list, key, max=3){
+  if(!Array.isArray(list)) return;
+  list.push(key);
+  while(list.length > max) list.shift();
+}
+
+function pickWeighted(items, g, recentKeys=[]){
+  let eligible = items.filter(item => !item.can || item.can(g));
+  if(recentKeys?.length){
+    const filtered = eligible.filter(item => !recentKeys.includes(item.id));
+    if(filtered.length >= Math.max(3, Math.ceil(eligible.length * 0.5))) eligible = filtered;
+  }
+  if(!eligible.length) return null;
+  const weighted = eligible.map(item => ({ item, weight: Math.max(0.1, typeof item.weight === "function" ? item.weight(g) : (item.weight || 1)) }));
+  const total = weighted.reduce((sum, entry) => sum + entry.weight, 0);
+  let roll = Math.random() * total;
+  for(const entry of weighted){
+    roll -= entry.weight;
+    if(roll <= 0) return entry.item;
+  }
+  return weighted[weighted.length - 1].item;
+}
+
+function pickDecision(g){
+  const d = pickWeighted(DECISIONS, g, g.recentDecisions);
+  if(d) rememberRecent(g.recentDecisions, d.id, 3);
+  return d;
+}
+
+function pickNormalEvent(g){
+  const ev = pickWeighted(EVENTS, g, g.recentEvents);
+  return ev;
+}
+
+function maybePick(arr, chance, g, recentKeys=[]){
   if(Math.random() > chance) return null;
-  return arr[Math.floor(Math.random()*arr.length)];
+  return pickWeighted(arr, g, recentKeys);
 }
 
 // ---------- ETF ----------
@@ -1283,23 +1464,28 @@ function runMonth(){
     g.lastReceipt.afterPlan = g.balance;
   }
   renderAll();
-  const d = DECISIONS[(g.month - 1) % DECISIONS.length];
-  openChoiceModal({
-    title: d.title,
-    text: d.text,
-    options: [
-      { label: d.a.label, meta: d.a.meta, impacts: impactPills(d.a), onPick: ()=>{ applyOption(g, d.a, "Entscheidung"); continueAfterDecision(g); } },
-      { label: d.b.label, meta: d.b.meta, impacts: impactPills(d.b), onPick: ()=>{ applyOption(g, d.b, "Entscheidung"); continueAfterDecision(g); } }
-    ]
-  });
+  const d = pickDecision(g);
+  if(d){
+    openChoiceModal({
+      title: d.title,
+      text: d.text,
+      options: [
+        { label: d.a.label, meta: d.a.meta, impacts: impactPills(d.a), onPick: ()=>{ applyOption(g, d.a, "Entscheidung"); continueAfterDecision(g); } },
+        { label: d.b.label, meta: d.b.meta, impacts: impactPills(d.b), onPick: ()=>{ applyOption(g, d.b, "Entscheidung"); continueAfterDecision(g); } }
+      ]
+    });
+  } else {
+    finalizeMonth(g);
+    return;
+  }
   g.hasRunThisMonth = true;
   el("btnRunMonth").disabled = true;
 }
 
 function continueAfterDecision(g){
   if(maybeRunStoryEvent(g)) return;
-  const chance = g.month <= 2 ? 0.20 : g.month <= 4 ? 0.35 : 0.50;
-  const ev = maybePick(EVENTS, chance);
+  const chance = g.phaseKey === "survival" ? 0.48 : g.phaseKey === "stability" ? 0.38 : g.phaseKey === "safety" ? 0.30 : 0.24;
+  const ev = maybePick(EVENTS, chance, g, g.recentEvents);
   if(ev){
     openEventModal({ title: ev.title, text: ev.text, onOk: ()=> ev.after(g) });
     return;
