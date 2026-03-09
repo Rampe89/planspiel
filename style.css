@@ -87,7 +87,7 @@ a{ color:inherit; }
 .microPill{ display:inline-block; font-size:var(--fs-sm); color:var(--muted); border:1px dashed rgba(15,23,42,.22); background:rgba(255,255,255,.85); padding:8px 10px; border-radius:var(--r-md); }
 .sideCard{ display:flex; flex-direction:column; gap:12px; }
 .avatarFrame{ border-radius:24px; border:1px solid var(--line); background:linear-gradient(180deg, rgba(255,255,255,.98), rgba(248,250,255,.92)); padding:16px; display:flex; justify-content:center; box-shadow:var(--sh2); }
-#avatar,#gameAvatar{ width:220px; height:220px; image-rendering:auto; border-radius:22px; border:1px solid rgba(15,23,42,.08); background:linear-gradient(180deg, rgba(255,255,255,.98), rgba(248,250,255,.92)); box-shadow: inset 0 1px 0 rgba(255,255,255,.9); }
+#avatar,#gameAvatar{ width:220px; height:220px; image-rendering:pixelated; image-rendering:crisp-edges; border-radius:22px; border:1px solid rgba(15,23,42,.08); background:linear-gradient(180deg, rgba(255,255,255,.98), rgba(248,250,255,.92)); box-shadow: inset 0 1px 0 rgba(255,255,255,.9); }
 .gameAvatarWrap{ display:flex; justify-content:center; margin-top:10px; }
 .avatarGameBox{ --avatar-bg: rgba(248,250,255,.95); --avatar-accent: #2563EB; --avatar-ink: #0F172A; background:linear-gradient(180deg, color-mix(in srgb, var(--avatar-bg) 92%, white), white); border-color:color-mix(in srgb, var(--avatar-accent) 24%, rgba(15,23,42,.08)); position:relative; overflow:hidden; }
 .avatarGameBox::before{ content:""; position:absolute; inset:0 0 auto 0; height:6px; background:linear-gradient(90deg, var(--avatar-accent), color-mix(in srgb, var(--avatar-accent) 45%, white)); }
@@ -224,7 +224,11 @@ canvas{ width:100%; height:auto; border-radius:var(--r-lg); background:rgba(248,
 ::selection{ background:rgba(37,99,235,.16); }
 @media (prefers-reduced-motion: reduce){ *{ transition:none !important; } }
 
-
-/* runtime fixes */
-#avatar,#gameAvatar{ image-rendering:pixelated; image-rendering:crisp-edges; }
-#chartBalance,#chartEtf{ image-rendering:auto; }
+.phaseCard .phaseBar{ margin:12px 0 8px; }
+.actionHead{ width:100%; display:flex; align-items:center; justify-content:space-between; gap:12px; background:none; border:0; padding:0; font:inherit; font-weight:950; cursor:pointer; color:var(--ink); }
+.actionGrid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px; }
+.actionBtn{ text-align:left; }
+.achievementsList{ display:flex; flex-direction:column; gap:10px; margin-top:10px; }
+.footerNote{ margin-top:8px; font-size:12px; color:var(--muted); }
+.mqAdvisor{ margin-top:12px; padding:10px 12px; border-radius:14px; background:rgba(248,250,255,.92); border:1px solid var(--line); font-size:14px; }
+.mqAdvisor strong{ display:block; margin-bottom:4px; }
