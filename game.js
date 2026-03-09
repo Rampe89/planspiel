@@ -632,10 +632,10 @@ function drawLineChart(canvas, values){
   if(!values || values.length < 2) return;
 
   const isEtf = canvas.id === "chartEtf";
-  const stroke = isEtf ? "#60A5FA" : "#4ADE80";
-  const glow = isEtf ? "rgba(96,165,250,.28)" : "rgba(74,222,128,.25)";
-  const grid = "rgba(255,255,255,.08)";
-  const text = "rgba(255,255,255,.75)";
+  const stroke = isEtf ? "#4C6EDB" : "#3F8C63";
+  const glow = isEtf ? "rgba(76,110,219,.18)" : "rgba(63,140,99,.16)";
+  const grid = "rgba(52,45,39,.10)";
+  const text = "rgba(29,36,48,.72)";
 
   const padL = 18 * dpr, padR = 12 * dpr, padT = 12 * dpr, padB = 18 * dpr;
   const min = Math.min(...values);
