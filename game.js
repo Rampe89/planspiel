@@ -520,6 +520,18 @@ function initialSocial(p){
   return clamp(s,0,100);
 }
 
+function initAssets(profile){
+  return {
+    hasPhone: true,
+    hasBackupPhone: profile.path !== "studium",
+    hasBike: profile.lifeMobility === "bike",
+    hasCar: profile.lifeMobility === "car",
+    hasTicket: profile.lifeMobility === "ticket",
+    hasLaptop: profile.field === "it" || profile.path === "studium",
+    phoneState: "ok"
+  };
+}
+
 function newGame(profile){
   const income = JOB_NET[profile.field]?.[profile.path] ?? 1700;
   const living = LIVING[profile.living] ?? LIVING.wg;
@@ -577,7 +589,8 @@ function newGame(profile){
     achievements: new Set(),
     recentDecisions: [],
     recentEvents: [],
-    storyFlags: { trainingDone:false, rentRaised:false, jobChanceTaken:false, taxBack:false }
+    storyFlags: { trainingDone:false, rentRaised:false, jobChanceTaken:false, taxBack:false },
+    assets: initAssets(profile)
   };
 }
 
@@ -862,7 +875,7 @@ function renderStats(g){
   el("gIncome").textContent = formatEUR(g.income);
   el("gCash").textContent = formatEUR(g.buckets.cash);
   el("gEtf").textContent = formatEUR(g.buckets.etf);
-  el("gBalanceHint").textContent = g.balance < g.dispoFloor ? "Kontosperre (Limit erreicht)" : (g.balance < 0 ? "Im Minus" : "OK");
+  el("gBalanceHint").textContent = g.sceneNote || (g.balance < g.dispoFloor ? "Kontosperre (Limit erreicht)" : (g.balance < 0 ? "Im Minus" : "OK"));
   el("gStabilityFill").style.width = `${g.stability}%`;
   el("gComfortFill").style.width = `${g.comfort}%`;
   el("gSocialFill").style.width = `${g.social}%`;
@@ -1201,20 +1214,75 @@ const DECISIONS = [
 const EVENTS = [
   {
     id:"phone_break",
-    title:"Handy kaputt",
-    text:"Dein Handy fällt runter. So etwas passt nie in den Monat.",
-    weight:g=> 1,
+    title:"Handy macht Probleme",
+    text:"Display, Akku oder Mikrofon – dein Handy läuft gerade nicht mehr rund.",
+    can:g=> !!g.assets?.hasPhone,
+    weight:g=> g.assets?.phoneState === "wacklig" ? 0.6 : 1.2,
     after(g){
       g.insuranceHints.add("Handy: Eine Versicherung kann helfen, ist aber nicht immer automatisch sinnvoll.");
       openChoiceModal({
-        title:"Handy kaputt",
-        text:"Was machst du?",
+        title:"Handy macht Probleme",
+        text:"Du musst nicht automatisch ein neues kaufen. Was ist für deine Lage realistisch?",
         options:[
-          { label:"Reparieren", meta:"Billiger, aber nicht perfekt.", impacts:impactPills({money:-120, stability:-1, comfort:-1, social:-1}), onPick:()=>{ applyOption(g, {label:"Reparieren", meta:"Billiger.", money:-120, stability:-1, comfort:-1, social:-1, effect:{ name:"Wackeliges Handy", months:2, comfort:-1, text:"Das reparierte Handy nervt noch etwas nach." }, scene:"Gerettet, aber nicht wirklich elegant."}, "Ereignis"); rememberRecent(g.recentEvents, "phone_break"); finalizeMonth(g); } },
-          { label:"Neu kaufen", meta:"Teurer, aber entspannter.", impacts:impactPills({money:-420, stability:-2, comfort:+2, social:+1}), onPick:()=>{ applyOption(g, {label:"Neu kaufen", meta:"Teurer.", money:-420, stability:-2, comfort:+2, social:+1, effect:{ name:"Große Anschaffung", months:1, stability:-1, text:"Große Anschaffungen drücken oft noch kurz nach." }, scene:"Technisch entspannt, finanziell aber ein echter Schlag."}, "Ereignis"); rememberRecent(g.recentEvents, "phone_break"); finalizeMonth(g); } }
+          { label:"Erstmal weiter nutzen", meta:"Nervig, aber erstmal kein direkter Geldschaden.", impacts:impactPills({money:0, stability:-1, comfort:-2, social:-1}), onPick:()=>{ g.assets.phoneState = "wacklig"; applyOption(g, {label:"Weiter nutzen", meta:"Kurz gespart.", money:0, stability:-1, comfort:-2, social:-1, effect:{ name:"Nerviges Handy", months:1, comfort:-1, text:"Ein kaputtes Handy kann den Alltag weiter nerven." }, scene:"Du sparst sofort Geld, kaufst dir aber Alltagstress ein."}, "Ereignis"); rememberRecent(g.recentEvents, "phone_break"); finalizeMonth(g); } },
+          { label:"Günstig reparieren", meta:"Vernünftig und deutlich realistischer als direkt neu.", impacts:impactPills({money:-90, stability:-1, comfort:+1, social:0}), onPick:()=>{ g.assets.phoneState = "ok"; applyOption(g, {label:"Reparieren", meta:"Solide Zwischenlösung.", money:-90, stability:-1, comfort:+1, social:0, scene:"Nicht perfekt, aber genau so lösen viele das im echten Leben."}, "Ereignis"); rememberRecent(g.recentEvents, "phone_break"); finalizeMonth(g); } },
+          { label:"Altes Ersatzhandy", meta:"Nicht schön, aber günstig.", impacts:impactPills({money:-35, stability:0, comfort:-1, social:-1}), onPick:()=>{ g.assets.phoneState = "ok"; applyOption(g, {label:"Ersatzgerät", meta:"Gebraucht oder alt aus der Schublade.", money:-35, stability:0, comfort:-1, social:-1, scene:"Pragmatisch. Nicht cool, aber machbar."}, "Ereignis"); rememberRecent(g.recentEvents, "phone_break"); finalizeMonth(g); } },
+          { label:"Ohne Handy weitermachen", meta:"Spart Geld, macht den Alltag aber härter.", impacts:impactPills({money:0, stability:-2, comfort:-3, social:-2}), onPick:()=>{ g.assets.hasPhone = false; g.assets.phoneState = "none"; applyOption(g, {label:"Ohne Handy", meta:"Radikale Sparlösung.", money:0, stability:-2, comfort:-3, social:-2, effect:{ name:"Ohne Smartphone", months:2, comfort:-1, social:-1, text:"Ohne Handy wird vieles umständlicher." }, scene:"Geht theoretisch – fühlt sich aber schnell sperrig an."}, "Ereignis"); rememberRecent(g.recentEvents, "phone_break"); finalizeMonth(g); } }
         ]
       });
     }
+  },
+  {
+    id:"used_phone_offer",
+    title:"Gebrauchtes Handy-Angebot",
+    text:"Jemand im Umfeld bietet dir ein gebrauchtes Handy günstig an.",
+    can:g=> !g.assets?.hasPhone,
+    weight:g=> 1.8,
+    after(g){
+      openChoiceModal({
+        title:"Gebrauchtes Handy-Angebot",
+        text:"Willst du wieder ein einfaches Gerät haben?",
+        options:[
+          { label:"Ja, nehme ich", meta:"Nicht neu, aber alltagstauglich.", impacts:impactPills({money:-60, stability:+1, comfort:+2, social:+2}), onPick:()=>{ g.assets.hasPhone = true; g.assets.phoneState = "ok"; applyOption(g, {label:"Gebrauchtes Handy", meta:"Kleine Anschaffung.", money:-60, stability:+1, comfort:+2, social:+2, scene:"Wieder erreichbar zu sein entspannt den Alltag sofort."}, "Ereignis"); rememberRecent(g.recentEvents, "used_phone_offer"); finalizeMonth(g); } },
+          { label:"Nein, noch nicht", meta:"Du bleibst erstmal ohne Gerät.", impacts:impactPills({money:0, stability:0, comfort:-1, social:-1}), onPick:()=>{ applyOption(g, {label:"Weiter ohne Handy", meta:"Noch etwas Geld gespart.", money:0, stability:0, comfort:-1, social:-1, scene:"Spart Geld – kostet aber weiter Komfort."}, "Ereignis"); rememberRecent(g.recentEvents, "used_phone_offer"); finalizeMonth(g); } }
+        ]
+      });
+    }
+  },
+  {
+    id:"bike_repair",
+    title:"Fahrrad reparieren",
+    text:"Schlauch, Bremse oder Licht – dein Fahrrad braucht Zuwendung.",
+    can:g=> !!g.assets?.hasBike,
+    weight:g=> 1.2,
+    after(g){
+      openChoiceModal({
+        title:"Fahrrad reparieren",
+        text:"Was ist für dich gerade realistisch?",
+        options:[
+          { label:"Selbst flicken", meta:"Günstiger, aber etwas Aufwand.", impacts:impactPills({money:-18, stability:+1, comfort:-1, social:0}), onPick:()=>{ applyOption(g,{label:"Selbst repariert", meta:"Material gekauft.", money:-18, stability:+1, comfort:-1, social:0, scene:"Kleine Sache, aber genau solche Beträge gehören zum Alltag."},"Ereignis"); rememberRecent(g.recentEvents, "bike_repair"); finalizeMonth(g);} },
+          { label:"Werkstatt", meta:"Bequemer, aber teurer.", impacts:impactPills({money:-55, stability:0, comfort:+1, social:0}), onPick:()=>{ applyOption(g,{label:"Werkstatt", meta:"Schneller erledigt.", money:-55, stability:0, comfort:+1, social:0, scene:"Bequem gelöst – der Monat merkt es trotzdem."},"Ereignis"); rememberRecent(g.recentEvents, "bike_repair"); finalizeMonth(g);} }
+        ]
+      });
+    }
+  },
+  {
+    id:"car_followup",
+    title:"Auto kostet wieder",
+    text:"Kleine Autokosten melden sich: Tanken, Parken oder etwas in der Werkstatt.",
+    can:g=> !!g.assets?.hasCar,
+    weight:g=> 1.4,
+    after(g){
+      openChoiceModal({
+        title:"Auto kostet wieder",
+        text:"Wie gehst du damit um?",
+        options:[
+          { label:"Zahlen und weiter", meta:"Nervig, aber nötig.", impacts:impactPills({money:-65, stability:-1, comfort:+1, social:0}), onPick:()=>{ applyOption(g,{label:"Autokosten bezahlt", meta:"Läuft weiter.", money:-65, stability:-1, comfort:+1, social:0, scene:"Das Auto bleibt praktisch – und eben teuer."},"Ereignis"); rememberRecent(g.recentEvents, "car_followup"); finalizeMonth(g);} },
+          { label:"Fahrten reduzieren", meta:"Spart Geld, ist aber unbequemer.", impacts:impactPills({money:-20, stability:+1, comfort:-2, social:0}), onPick:()=>{ applyOption(g,{label:"Autofahrten reduziert", meta:"Etwas eingespart.", money:-20, stability:+1, comfort:-2, social:0, effect:{ name:"Weniger Autofahrten", months:1, money:+20, comfort:-1, text:"Weniger Fahrten sparen noch etwas Geld." }, scene:"Spürbar günstiger – aber eben auch weniger bequem."},"Ereignis"); rememberRecent(g.recentEvents, "car_followup"); finalizeMonth(g);} }
+        ]
+      });
+    }
+  },
   },
   {
     id:"prescription",
@@ -1590,6 +1658,11 @@ function startGame(){
   timelineClear();
   timelineInfo("Start", "Klick auf „Monat starten“. Dann siehst du alles Schritt für Schritt.");
   renderAll();
+  renderGameAvatar();
+  requestAnimationFrame(()=>{
+    renderAll();
+    renderCharts(state.game);
+  });
 }
 
 // ---------- Bind ----------
