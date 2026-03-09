@@ -225,17 +225,6 @@ canvas{ width:100%; height:auto; border-radius:var(--r-lg); background:rgba(248,
 @media (prefers-reduced-motion: reduce){ *{ transition:none !important; } }
 
 
-/* Stable pass */
-.actionHead{width:100%;display:flex;justify-content:space-between;align-items:center;gap:10px;padding:0;border:0;background:transparent;color:var(--ink);font:inherit;font-weight:950;cursor:pointer;}
-.actionGrid{display:grid;grid-template-columns:1fr;gap:8px;margin-top:10px;}
-.actionBtn{justify-content:flex-start;text-align:left;}
-#actionBody{margin-top:10px;}
-.mqAdvisor{margin-top:12px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r-lg);background:rgba(248,250,255,.92);font-size:var(--fs-sm);line-height:1.55;color:var(--muted);}
-.mqAdvisor strong{display:block;color:var(--ink);margin-bottom:4px;}
-.achievementsList{display:flex;flex-direction:column;gap:8px;margin-top:10px;}
-.achievementItem{padding:10px 12px;border:1px solid var(--line);border-radius:var(--r-lg);background:rgba(248,250,255,.92);}
-.achievementItem.done{border-color:rgba(22,163,74,.26);background:rgba(22,163,74,.08);}
-.achievementTitle{font-weight:900;font-size:var(--fs-sm);}
-.achievementText{font-size:var(--fs-sm);color:var(--muted);margin-top:4px;line-height:1.45;}
-.phaseBar{margin-top:10px;}
-.phasePerk{margin-top:10px;}
+/* runtime fixes */
+#avatar,#gameAvatar{ image-rendering:pixelated; image-rendering:crisp-edges; }
+#chartBalance,#chartEtf{ image-rendering:auto; }
