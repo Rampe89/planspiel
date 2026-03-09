@@ -19,129 +19,314 @@ function toast(title, text){
 }
 
 // ---------- Avatar ----------
-const AVATAR_PALETTES = {
-  hair: ["#111827","#1F2937","#3F3F46","#7C2D12","#4B5563"],
-  skin: ["#F2D6C9","#F6E0C6","#DDB7A0","#CFA08A","#EBC7B0"],
-  shirt:["#2563EB","#16A34A","#F97316","#7C3AED","#0EA5E9","#EC4899"],
-  bg:   ["#E2E8F0","#DCFCE7","#E0F2FE","#FEF3C7","#FCE7F3"]
+const FIELD_THEMES = {
+  it:          { bg:"#DBEAFE", ink:"#1D4ED8", soft:"#EFF6FF", accent:"#38BDF8", label:"IT" },
+  pflege:      { bg:"#DCFCE7", ink:"#15803D", soft:"#F0FDF4", accent:"#34D399", label:"Pflege" },
+  handwerk:    { bg:"#FFEDD5", ink:"#C2410C", soft:"#FFF7ED", accent:"#FB923C", label:"Handwerk" },
+  buero:       { bg:"#E2E8F0", ink:"#475569", soft:"#F8FAFC", accent:"#94A3B8", label:"Büro" },
+  einzelhandel:{ bg:"#F3E8FF", ink:"#7E22CE", soft:"#FAF5FF", accent:"#C084FC", label:"Einzelhandel" },
 };
 
-function seededRng(seed){
-  let s = seed || 1337;
-  return () => (s = (s*1664525 + 1013904223) >>> 0) / 4294967296;
-}
+const LIVING_ACCENTS = {
+  wg: "#22C55E",
+  miete: "#2563EB",
+  eltern: "#F59E0B",
+  eigentum: "#8B5CF6",
+};
 
-function makeAvatarData(seed){
-  const r = seededRng(seed);
-  return {
-    bg: AVATAR_PALETTES.bg[Math.floor(r()*AVATAR_PALETTES.bg.length)],
-    skin: AVATAR_PALETTES.skin[Math.floor(r()*AVATAR_PALETTES.skin.length)],
-    hair: AVATAR_PALETTES.hair[Math.floor(r()*AVATAR_PALETTES.hair.length)],
-    shirt: AVATAR_PALETTES.shirt[Math.floor(r()*AVATAR_PALETTES.shirt.length)],
-    eyeOffset: Math.floor(r()*2),
-    fringe: Math.floor(r()*2),
-  };
-}
-
-function drawAvatarOnCanvas(canvasId, avatarData, mood="neutral"){
-  const c = el(canvasId);
-  if(!c) return;
-  const ctx = c.getContext("2d");
-  ctx.imageSmoothingEnabled = false;
-  ctx.clearRect(0,0,16,16);
-
-  ctx.fillStyle = avatarData.bg;
-  ctx.fillRect(0,0,16,16);
-
-  ctx.fillStyle = avatarData.skin;
-  ctx.fillRect(4,4,8,8);
-
-  ctx.fillStyle = avatarData.hair;
-  ctx.fillRect(4,4,8,3);
-  if(avatarData.fringe) ctx.fillRect(5,6,2,1);
-
-  ctx.fillStyle = "#111827";
-  ctx.fillRect(6,7 + avatarData.eyeOffset,1,1);
-  ctx.fillRect(9,7 + avatarData.eyeOffset,1,1);
-
-  if(mood === "happy"){
-    ctx.fillRect(7,10,2,1);
-    ctx.clearRect(7,9,2,1);
-  } else if(mood === "sad" || mood === "stressed"){
-    ctx.fillRect(7,9,2,1);
-    ctx.clearRect(7,10,2,1);
-    if(mood === "stressed") ctx.fillRect(6,6,1,1);
-  } else {
-    ctx.fillRect(7,10,2,1);
-  }
-
-  ctx.fillStyle = avatarData.shirt;
-  ctx.fillRect(4,12,8,4);
-  ctx.fillStyle = "rgba(255,255,255,.85)";
-  ctx.fillRect(7,13,2,1);
-}
-
-let avatarSalt = 0;
-const state = {
-  profile: null,
-  game: null,
-  avatarSeed: 1337,
-  avatarData: makeAvatarData(1337),
-  previewMood: "neutral"
+const PATH_OUTFITS = {
+  ausbildung: "hoodie",
+  studium: "sweater",
+  job: "blazer",
 };
 
 function hashString(str){
-  let h = 2166136261;
-  for(let i = 0; i < str.length; i++){
+  let h = 2166136261 >>> 0;
+  for(let i=0;i<str.length;i++){
     h ^= str.charCodeAt(i);
     h = Math.imul(h, 16777619);
   }
   return h >>> 0;
 }
 
-function getAvatarProfileSeed(profile){
-  if(!profile) return 1337;
-  const key = [
-    profile.path,
-    profile.field,
-    profile.living,
-    profile.family,
-    profile.style,
-    profile.lifeFood,
-    profile.lifeFun,
-    profile.lifeShop,
-    profile.lifeSubs,
-    profile.lifeMobility,
-    avatarSalt
-  ].join("|");
-  return hashString(key);
+function seededRng(seed){
+  let s = seed || 1337;
+  return () => (s = (s*1664525 + 1013904223) >>> 0) / 4294967296;
 }
 
-function syncAvatarFromProfile(profile){
-  const seed = getAvatarProfileSeed(profile);
-  state.avatarSeed = seed;
-  state.avatarData = makeAvatarData(seed);
+function choose(arr, rng){
+  return arr[Math.floor(rng() * arr.length)];
+}
+
+let avatarSalt = 0;
+const state = {
+  profile: null,
+  game: null,
+  avatarData: null,
+  previewMood: "neutral"
+};
+
+function getProfileSeed(profile){
+  if(!profile) return 1337;
+  return hashString([
+    profile.style,
+    profile.field,
+    profile.path,
+    profile.living,
+    profile.family,
+    avatarSalt
+  ].join("|"));
+}
+
+function buildAvatarFromProfile(profile){
+  const seed = getProfileSeed(profile);
+  const rng = seededRng(seed);
+  const theme = FIELD_THEMES[profile?.field] ?? FIELD_THEMES.it;
+  const styleKey = profile?.style ?? "neutral";
+  const skin = choose(["#F8D7C4","#F0C6AA","#E8BC9D","#DCA98A","#C98D6D"], rng);
+
+  const hairPools = {
+    masc: ["buzz","crop","side"],
+    fem: ["bob","wave","long"],
+    neutral: ["crop","bob","side"]
+  };
+  const jawPools = { masc: "square", fem: "soft", neutral: "mid" };
+  const browPools = { masc: "strong", fem: "soft", neutral: rng() > 0.5 ? "soft" : "strong" };
+  const eyePools = { masc: "almond", fem: "round", neutral: rng() > 0.5 ? "almond" : "round" };
+  const nosePools = { masc: "straight", fem: "small", neutral: rng() > 0.5 ? "small" : "straight" };
+
+  const hair = choose(hairPools[styleKey] ?? hairPools.neutral, rng);
+  const hairColor = choose(
+    styleKey === "fem"
+      ? ["#111827","#3F3F46","#6B7280","#7C2D12"]
+      : styleKey === "masc"
+      ? ["#111827","#1F2937","#4B5563","#7C2D12"]
+      : ["#111827","#374151","#6B7280","#7C2D12"],
+    rng
+  );
+
+  const outfit = PATH_OUTFITS[profile?.path] ?? "hoodie";
+  const accessory = profile?.lifeMobility === "bike" ? "strap" : profile?.lifeMobility === "car" ? "keys" : profile?.lifeMobility === "ticket" ? "card" : "none";
+
+  return {
+    theme, skin, hair, hairColor,
+    brow: browPools[styleKey] ?? "soft",
+    jaw: jawPools[styleKey] ?? "mid",
+    eyeShape: eyePools[styleKey] ?? "almond",
+    noseShape: nosePools[styleKey] ?? "small",
+    outfit, accessory,
+    accent: LIVING_ACCENTS[profile?.living] ?? "#2563EB",
+    family: profile?.family ?? "single",
+    styleKey
+  };
 }
 
 function regenAvatar(){
-  avatarSalt++;
-  const profile = readProfile();
-  syncAvatarFromProfile(profile);
+  avatarSalt = (avatarSalt + 1) % 4;
+  const profile = state.profile || readProfile();
+  state.avatarData = buildAvatarFromProfile(profile);
   renderAvatarPreview();
+  if(state.game) renderGameAvatar();
 }
 
 function deriveAvatarMood(g){
   if(!g) return "neutral";
   if(g.balance <= g.dispoFloor || g.redMonths >= 3) return "stressed";
   const score =
-    (g.balance >= 0 ? 1 : -2) +
-    (g.buckets.cash >= 500 ? 1 : -1) +
-    (g.stability >= 65 ? 1 : g.stability <= 35 ? -1 : 0) +
-    (g.social >= 60 ? 1 : g.social <= 30 ? -1 : 0) +
-    (g.comfort >= 60 ? 1 : g.comfort <= 30 ? -1 : 0);
-  if(score >= 2) return "happy";
+    (g.balance >= 250 ? 2 : g.balance >= 0 ? 1 : -2) +
+    (g.buckets.cash >= 1000 ? 2 : g.buckets.cash >= 300 ? 1 : -1) +
+    (g.stability >= 70 ? 1 : g.stability <= 35 ? -1 : 0) +
+    (g.social >= 62 ? 1 : g.social <= 30 ? -1 : 0) +
+    (g.comfort >= 62 ? 1 : g.comfort <= 30 ? -1 : 0);
+  if(score >= 3) return "happy";
   if(score <= -2) return "sad";
   return "neutral";
+}
+
+function drawRoundedRect(ctx, x, y, w, h, r, fill){
+  ctx.fillStyle = fill;
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);
+  ctx.arcTo(x,y,x+w,y,r);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function drawAvatarOnCanvas(canvasId, avatarData, mood="neutral"){
+  const c = el(canvasId);
+  if(!c || !avatarData) return;
+
+  const size = 160;
+  const scale = Math.max(2, Math.floor(window.devicePixelRatio || 2));
+  c.width = size * scale;
+  c.height = size * scale;
+  c.style.width = size + "px";
+  c.style.height = size + "px";
+  c.style.imageRendering = "pixelated";
+
+  const ctx = c.getContext("2d");
+  ctx.setTransform(scale,0,0,scale,0,0);
+  ctx.imageSmoothingEnabled = false;
+  ctx.clearRect(0,0,size,size);
+
+  const theme = avatarData.theme;
+  const moodMap = {
+    happy: { mouth: "smile", brow: -4, eye: 0, aura: "#DCFCE7" },
+    neutral: { mouth: "flat", brow: 0, eye: 0, aura: theme.soft },
+    sad: { mouth: "sad", brow: 3, eye: -1, aura: "#E5E7EB" },
+    stressed: { mouth: "tense", brow: 6, eye: -2, aura: "#FEE2E2" },
+  };
+  const moodCfg = moodMap[mood] ?? moodMap.neutral;
+
+  drawRoundedRect(ctx, 8, 8, 144, 144, 24, "#FFFFFF");
+  drawRoundedRect(ctx, 12, 12, 136, 136, 22, theme.soft);
+  ctx.fillStyle = moodCfg.aura;
+  ctx.beginPath();
+  ctx.arc(80, 68, 44, 0, Math.PI*2);
+  ctx.fill();
+
+  ctx.strokeStyle = theme.accent;
+  ctx.lineWidth = 8;
+  ctx.beginPath();
+  ctx.arc(80, 68, 48, 0.2, Math.PI * 1.85);
+  ctx.stroke();
+
+  const outfitColor = avatarData.outfit === "blazer" ? "#334155" : avatarData.outfit === "sweater" ? "#4F46E5" : "#0F766E";
+  drawRoundedRect(ctx, 40, 102, 80, 38, 18, outfitColor);
+  if(avatarData.outfit === "blazer"){
+    ctx.fillStyle = "#E2E8F0";
+    ctx.beginPath(); ctx.moveTo(80,106); ctx.lineTo(68,140); ctx.lineTo(92,140); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#1E293B";
+    ctx.fillRect(78,118,4,18);
+  }else if(avatarData.outfit === "hoodie"){
+    ctx.fillStyle = "#CCFBF1";
+    ctx.beginPath(); ctx.arc(80,110,12,0,Math.PI*2); ctx.fill();
+  }else{
+    ctx.fillStyle = "#C7D2FE";
+    ctx.fillRect(68,114,24,10);
+  }
+
+  if(avatarData.accessory === "card"){
+    drawRoundedRect(ctx, 101, 116, 16, 12, 3, "#FEF3C7");
+    ctx.fillStyle = "#F59E0B";
+    ctx.fillRect(104,119,10,2);
+  }else if(avatarData.accessory === "keys"){
+    ctx.strokeStyle = "#F59E0B";
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(110,120,5,0,Math.PI*2); ctx.stroke();
+    ctx.fillStyle = "#F59E0B";
+    ctx.fillRect(113,119,7,3);
+  }else if(avatarData.accessory === "strap"){
+    ctx.strokeStyle = "#93C5FD";
+    ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(52,105); ctx.lineTo(95,140); ctx.stroke();
+  }
+
+  drawRoundedRect(ctx, 70, 84, 20, 18, 8, avatarData.skin);
+  const jawRadius = avatarData.jaw === "square" ? 12 : avatarData.jaw === "soft" ? 20 : 16;
+  drawRoundedRect(ctx, 48, 28, 64, 64, jawRadius, avatarData.skin);
+  ctx.fillStyle = avatarData.skin;
+  ctx.fillRect(44,52,6,14);
+  ctx.fillRect(110,52,6,14);
+
+  ctx.fillStyle = avatarData.hairColor;
+  if(avatarData.hair === "buzz"){
+    drawRoundedRect(ctx, 50, 26, 60, 18, 12, avatarData.hairColor);
+  }else if(avatarData.hair === "crop"){
+    drawRoundedRect(ctx, 46, 22, 68, 26, 14, avatarData.hairColor);
+    ctx.fillRect(46,36,10,26);
+    ctx.fillRect(104,36,10,22);
+  }else if(avatarData.hair === "side"){
+    drawRoundedRect(ctx, 46, 22, 68, 24, 14, avatarData.hairColor);
+    ctx.fillRect(46,34,12,32);
+    ctx.beginPath(); ctx.moveTo(58,26); ctx.lineTo(96,26); ctx.lineTo(76,44); ctx.closePath(); ctx.fill();
+  }else if(avatarData.hair === "bob"){
+    drawRoundedRect(ctx, 44, 22, 72, 24, 16, avatarData.hairColor);
+    ctx.fillRect(44,36,14,38);
+    ctx.fillRect(102,36,14,38);
+  }else if(avatarData.hair === "wave"){
+    drawRoundedRect(ctx, 42, 22, 76, 26, 16, avatarData.hairColor);
+    ctx.beginPath(); ctx.moveTo(44,42); ctx.quadraticCurveTo(58,58,52,76); ctx.lineTo(42,78); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(116,42); ctx.quadraticCurveTo(102,58,108,78); ctx.lineTo(118,78); ctx.closePath(); ctx.fill();
+  }else if(avatarData.hair === "long"){
+    drawRoundedRect(ctx, 42, 22, 76, 24, 16, avatarData.hairColor);
+    ctx.fillRect(42,36,16,48);
+    ctx.fillRect(102,36,16,48);
+  }
+
+  const browY = 52 + moodCfg.eye;
+  const eyeY = 63 + moodCfg.eye;
+  ctx.strokeStyle = "#0F172A";
+  ctx.lineWidth = avatarData.brow === "strong" ? 4 : 3;
+  ctx.beginPath();
+  ctx.moveTo(60, browY + moodCfg.brow); ctx.lineTo(72, browY);
+  ctx.moveTo(88, browY); ctx.lineTo(100, browY + moodCfg.brow);
+  ctx.stroke();
+
+  ctx.fillStyle = "#0F172A";
+  if(avatarData.eyeShape === "round"){
+    ctx.beginPath(); ctx.ellipse(66, eyeY, 4.5, 5.5, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(94, eyeY, 4.5, 5.5, 0, 0, Math.PI*2); ctx.fill();
+  }else{
+    ctx.beginPath(); ctx.ellipse(66, eyeY, 5.2, 4.2, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(94, eyeY, 5.2, 4.2, 0, 0, Math.PI*2); ctx.fill();
+  }
+
+  ctx.strokeStyle = "rgba(15,23,42,.25)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  if(avatarData.noseShape === "straight"){
+    ctx.moveTo(80,66); ctx.lineTo(79,77); ctx.lineTo(82,77);
+  }else{
+    ctx.moveTo(80,68); ctx.lineTo(77,75); ctx.lineTo(82,76);
+  }
+  ctx.stroke();
+
+  ctx.strokeStyle = "#7C2D12";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  if(moodCfg.mouth === "smile"){
+    ctx.arc(80, 82, 10, 0.15, Math.PI - 0.15, false);
+  }else if(moodCfg.mouth === "sad"){
+    ctx.arc(80, 92, 10, Math.PI + 0.2, (Math.PI*2) - 0.2, false);
+  }else if(moodCfg.mouth === "tense"){
+    ctx.moveTo(71,84); ctx.lineTo(89,84);
+  }else{
+    ctx.moveTo(72,84); ctx.lineTo(88,84);
+  }
+  ctx.stroke();
+
+  if(mood === "stressed"){
+    ctx.fillStyle = "#60A5FA";
+    ctx.beginPath(); ctx.moveTo(112,52); ctx.lineTo(118,66); ctx.lineTo(108,66); ctx.closePath(); ctx.fill();
+  }else if(mood === "happy"){
+    ctx.fillStyle = "#FACC15";
+    ctx.beginPath(); ctx.arc(116,54,4,0,Math.PI*2); ctx.fill();
+    ctx.fillRect(115,46,2,5); ctx.fillRect(115,57,2,5); ctx.fillRect(108,53,5,2); ctx.fillRect(119,53,5,2);
+  }
+
+  drawRoundedRect(ctx, 22, 22, 42, 18, 9, theme.bg);
+  ctx.fillStyle = theme.ink;
+  ctx.font = "bold 10px system-ui";
+  ctx.fillText(theme.label, 30, 34);
+
+  ctx.fillStyle = avatarData.accent;
+  ctx.beginPath(); ctx.arc(126, 126, 10, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = "#FFFFFF";
+  ctx.font = "bold 10px system-ui";
+  const livingLetter = ({ wg:"W", miete:"M", eltern:"E", eigentum:"H" })[(state.profile?.living) || (readProfile()?.living)] || "W";
+  ctx.fillText(livingLetter, 123, 129);
+
+  if(avatarData.family === "partner"){
+    ctx.fillStyle = "#F472B6";
+    ctx.fillRect(25,118,10,10);
+  }else if(avatarData.family === "kind"){
+    ctx.fillStyle = "#22C55E";
+    ctx.beginPath(); ctx.arc(30,123,6,0,Math.PI*2); ctx.fill();
+  }
 }
 
 function renderAvatarPreview(){
@@ -152,21 +337,29 @@ function renderGameAvatar(){
   if(!state.game) return;
   const mood = deriveAvatarMood(state.game);
   drawAvatarOnCanvas("gameAvatar", state.avatarData, mood);
-  el("avatarMoodLabel").textContent = mood === "happy" ? "glücklich" : mood === "sad" ? "traurig" : mood === "stressed" ? "gestresst" : "neutral";
-  el("avatarMoodText").textContent =
-    mood === "happy" ? "Deine Lage ist gerade ziemlich stabil." :
-    mood === "sad" ? "Deine Figur merkt: Es läuft gerade eher schwierig." :
-    mood === "stressed" ? "Viele Warnzeichen gleichzeitig. Das fühlt sich anstrengend an." :
-    "Im Moment ist die Lage gemischt.";
+  if(el("avatarMoodLabel")) el("avatarMoodLabel").textContent =
+    mood === "happy" ? "stabil" :
+    mood === "sad" ? "gedrückt" :
+    mood === "stressed" ? "gestresst" : "neutral";
+  if(el("avatarMoodText")) el("avatarMoodText").textContent =
+    mood === "happy" ? "Man sieht es sofort: genug Luft, ruhiger Blick, ordentliche Reserven." :
+    mood === "sad" ? "Die Lage zieht sichtbar runter. Wenig Puffer und wenig Leichtigkeit." :
+    mood === "stressed" ? "Viele Warnsignale gleichzeitig: angespannter Blick, harte Monatssituation." :
+    "Gerade ist die Lage gemischt. Noch nicht schlimm, aber auch nicht komplett entspannt.";
 }
+
+state.avatarData = buildAvatarFromProfile({
+  style:"neutral", field:"it", path:"ausbildung", living:"wg", family:"single",
+  lifeFood:"normal", lifeFun:"mid", lifeShop:"mid", lifeSubs:"few", lifeMobility:"ticket"
+});
 
 // ---------- Model ----------
 const JOB_NET = {
-  it:          { ausbildung: 1100, studium: 950, job: 2500 },
-  pflege:      { ausbildung: 1150, studium: 1000, job: 2300 },
-  handwerk:    { ausbildung: 1050, studium: 900, job: 2400 },
-  buero:       { ausbildung: 1000, studium: 900, job: 2100 },
-  einzelhandel:{ ausbildung: 980,  studium: 850, job: 2000 },
+  it:          { ausbildung: 1080, studium: 930, job: 2380 },
+  pflege:      { ausbildung: 1120, studium: 960, job: 2240 },
+  handwerk:    { ausbildung: 1040, studium: 880, job: 2320 },
+  buero:       { ausbildung: 980,  studium: 860, job: 2050 },
+  einzelhandel:{ ausbildung: 950,  studium: 820, job: 1950 },
 };
 
 const LIVING = {
@@ -204,6 +397,113 @@ const LOAN_TYPES = {
   dispo:  { label:"Dispo",  apr: 11.0, minMonths: 6,  maxMonths: 24 },
 };
 
+const LIFE_PHASES = [
+  { key:"survival", name:"Überleben", desc:"Gerade geht es vor allem darum, nicht abzusaufen und kleine Löcher zu stopfen.", perk:"Kleine Ziele, hohe Aufmerksamkeit", next:"stability" },
+  { key:"stability", name:"Stabilität", desc:"Du bekommst Struktur ins Budget. Nicht reich, aber kontrollierter.", perk:"Mehr Spielraum für Planung", next:"safety" },
+  { key:"safety", name:"Sicherheit", desc:"Rücklagen geben dir Luft. Fehler tun weh, werfen dich aber nicht sofort um.", perk:"Weniger Krisendruck", next:"growth" },
+  { key:"growth", name:"Aufbau", desc:"Jetzt geht es nicht nur ums Überleben, sondern um echten Aufbau.", perk:"Langfristiger Vermögensaufbau", next:null },
+];
+
+const ACHIEVEMENTS = [
+  { key:"first_buffer", title:"Erster Puffer", text:"Du hast 300 € Notgroschen erreicht.", check:g=>g.buckets.cash >= 300 },
+  { key:"big_buffer", title:"Starker Notgroschen", text:"Du hast 1.000 € Rücklage aufgebaut.", check:g=>g.buckets.cash >= 1000 },
+  { key:"first_etf", title:"Erster ETF-Schritt", text:"Du hast erstmals in ETF investiert.", check:g=>g.buckets.etf > 0 },
+  { key:"three_green", title:"Saubere Serie", text:"Drei Monate in Folge nicht im Minus.", check:g=>g.greenMonthsStreak >= 3 },
+  { key:"side_hustle", title:"Nebenjob-Mindset", text:"Du hast dir zusätzlich Einkommen organisiert.", check:g=>g.sideJobUsed },
+  { key:"new_home", title:"Kosten clever gedrückt", text:"Du bist in eine WG gezogen und senkst deine Wohnkosten.", check:g=>g.movedToWG },
+  { key:"loan_free", title:"Schuldenfrei", text:"Kein laufender Kredit mehr und trotzdem im Plus.", check:g=>!g.loan.active && g.month >= 6 && g.balance >= 0 },
+  { key:"no_crash_half", title:"Halbzeit ohne Absturz", text:"Nach 6 Monaten noch kein Minus-Monat.", check:g=>g.month >= 6 && g.redMonths === 0 },
+];
+
+function phaseScore(g){
+  return Math.max(0, g.buckets.cash + Math.max(0,g.balance) + Math.max(0, g.buckets.etf*0.35) - g.redMonths*120);
+}
+
+function updatePhase(g){
+  const score = phaseScore(g);
+  let key = "survival";
+  if(score >= 1600) key = "growth";
+  else if(score >= 900) key = "safety";
+  else if(score >= 400) key = "stability";
+  g.phaseKey = key;
+}
+
+function renderPhase(g){
+  updatePhase(g);
+  const phase = LIFE_PHASES.find(p=>p.key===g.phaseKey) || LIFE_PHASES[0];
+  const thresholds = { survival:400, stability:900, safety:1600, growth:2000 };
+  const prevThreshold = { survival:0, stability:400, safety:900, growth:1600 }[phase.key];
+  const maxThreshold = thresholds[phase.key];
+  const progress = phase.key === 'growth' ? 100 : Math.round(Math.max(0, Math.min(1, (phaseScore(g)-prevThreshold)/(maxThreshold-prevThreshold))) * 100);
+  if(el('phaseName')) el('phaseName').textContent = phase.name;
+  if(el('phaseDesc')) el('phaseDesc').textContent = phase.desc;
+  if(el('phasePerk')) el('phasePerk').textContent = phase.perk;
+  if(el('phaseMeta')) el('phaseMeta').textContent = phase.next ? `Nächste Phase: ${LIFE_PHASES.find(p=>p.key===phase.next)?.name || '-'}` : 'Letzte Phase erreicht';
+  if(el('phaseFill')) el('phaseFill').style.width = progress + '%';
+}
+
+function renderAchievements(g){
+  for(const a of ACHIEVEMENTS){
+    if(a.check(g)) g.achievements.add(a.key);
+  }
+  const root = el("achievementsList");
+  if(!root) return;
+  root.innerHTML = "";
+  for(const a of ACHIEVEMENTS){
+    const ok = g.achievements.has(a.key);
+    const row = document.createElement("div");
+    row.className = `achievementItem${ok ? " is-on" : ""}`;
+    row.innerHTML = `
+      <div class="achievementIcon">${ok ? "✓" : "•"}</div>
+      <div>
+        <div class="achievementTitle">${a.title}</div>
+        <div class="achievementText">${a.text}</div>
+      </div>
+    `;
+    root.appendChild(row);
+  }
+  if(el("achievementMeta")) el("achievementMeta").textContent = `${g.achievements.size}/${ACHIEVEMENTS.length} freigeschaltet`;
+}
+
+function maybeRunStoryEvent(g){
+  const candidates = [];
+  if(g.month >= 4 && !g.storyFlags.trainingDone) candidates.push('training');
+  if(g.month >= 5 && !g.storyFlags.rentRaised && !g.movedToWG && state.profile?.living !== 'eltern') candidates.push('rent');
+  if(g.month >= 7 && !g.storyFlags.jobChanceTaken) candidates.push('job');
+  if(g.month >= 8 && !g.storyFlags.taxBack) candidates.push('tax');
+  if(!candidates.length || Math.random() > 0.18) return false;
+  const pick = candidates[Math.floor(Math.random()*candidates.length)];
+  if(pick === 'training'){
+    openChoiceModal({ title:'Weiterbildungsmöglichkeit', text:'Ein kompakter Kurs kostet jetzt Geld, könnte sich später aber lohnen.', options:[
+      { label:'Kurs buchen', meta:'Jetzt teuer, später stärker.', impacts:impactPills({money:-280, stability:+1, comfort:-1, social:-1}), onPick:()=>{ g.storyFlags.trainingDone=true; g.balance-=280; g.income+=180; timelineItem('Weiterbildung bezahlt', -280, 'Das tut jetzt weh, kann sich aber künftig auszahlen.'); timelineInfo('Neue Einkommensstufe', '+180 € Netto pro Monat ab jetzt.'); finalizeMonth(g); } },
+      { label:'Ablehnen', meta:'Kein Extra-Risiko.', impacts:impactPills({money:0, stability:0, comfort:+1, social:0}), onPick:()=>{ timelineInfo('Weiterbildung vertagt', 'Du gehst kein Risiko ein, verpasst aber vielleicht eine Chance.'); finalizeMonth(g); } }
+    ]});
+    return true;
+  }
+  if(pick === 'rent'){
+    openChoiceModal({ title:'Mieterhöhung', text:'Deine Wohnkosten steigen. Wie reagierst du?', options:[
+      { label:'Zähne zusammenbeißen', meta:'Läuft weiter, aber teurer.', impacts:impactPills({money:0, stability:-2, comfort:-1, social:0}), onPick:()=>{ g.storyFlags.rentRaised=true; g.fixed.rent += 60; timelineInfo('Wohnkosten steigen', '+60 € Miete pro Monat ab jetzt.'); finalizeMonth(g); } },
+      { label:'WG als Rettung', meta:'Einmal schlucken, dann günstiger wohnen.', impacts:impactPills({money:-220, stability:+2, comfort:-3, social:+2}), onPick:()=>{ g.storyFlags.rentRaised=true; g.balance -= 220; g.fixed.rent = LIVING.wg.rent; g.fixed.utilities = LIVING.wg.utilities; g.fixed.internet = LIVING.wg.internet; g.movedToWG = true; if(state.profile) state.profile.living = 'wg'; state.avatarData = buildAvatarFromProfile(state.profile || readProfile()); timelineItem('WG-Umzug', -220, 'Umzug kostet, drückt aber deine laufenden Wohnkosten.'); finalizeMonth(g); } }
+    ]});
+    return true;
+  }
+  if(pick === 'job'){
+    openChoiceModal({ title:'Jobchance', text:'Ein etwas besserer Job wäre drin. Mehr Geld, aber auch mehr Druck.', options:[
+      { label:'Annehmen', meta:'Mehr Geld, weniger Leichtigkeit.', impacts:impactPills({money:0, stability:+3, comfort:-2, social:-2}), onPick:()=>{ g.storyFlags.jobChanceTaken=true; g.income += 220; g.comfort = clamp(g.comfort - 2,0,100); g.social = clamp(g.social - 2,0,100); timelineInfo('Neuer Joblevel', '+220 € Netto pro Monat. Dafür wird der Alltag etwas härter.'); finalizeMonth(g); } },
+      { label:'Lieber lassen', meta:'Weniger Risiko, aber auch weniger Entwicklung.', impacts:impactPills({money:0, stability:0, comfort:+1, social:+1}), onPick:()=>{ timelineInfo('Chance abgelehnt', 'Du entscheidest dich für Ruhe statt Extra-Druck.'); finalizeMonth(g); } }
+    ]});
+    return true;
+  }
+  if(pick === 'tax'){
+    g.storyFlags.taxBack = true;
+    g.balance += 190;
+    timelineItem('Steuererstattung', +190, 'Ein seltener echter Push von außen.');
+    finalizeMonth(g);
+    return true;
+  }
+  return false;
+}
+
 function calcMonthlyRate(amount, months, apr){
   if(amount <= 0) return 0;
   const r = (apr/100) / 12;
@@ -235,13 +535,25 @@ function initialSocial(p){
   return clamp(s,0,100);
 }
 
+function initAssets(profile){
+  return {
+    hasPhone: true,
+    hasBackupPhone: profile.path !== "studium",
+    hasBike: profile.lifeMobility === "bike",
+    hasCar: profile.lifeMobility === "car",
+    hasTicket: profile.lifeMobility === "ticket",
+    hasLaptop: profile.field === "it" || profile.path === "studium",
+    phoneState: "ok"
+  };
+}
+
 function newGame(profile){
   const income = JOB_NET[profile.field]?.[profile.path] ?? 1700;
   const living = LIVING[profile.living] ?? LIVING.wg;
   const life = lifestyleBudgets(profile);
   return {
     month: 1,
-    balance: 350,
+    balance: 560,
     income,
     dispoFloor: -500,
     fixed: {
@@ -274,10 +586,26 @@ function newGame(profile){
     stability: 55,
     comfort: initialComfort(profile),
     social: initialSocial(profile),
-    historyBalance: [350],
+    historyBalance: [560],
     historyEtf: [0],
     hasRunThisMonth: false,
-    lastReceipt: null
+    lastReceipt: null,
+    effects: [],
+    sceneNote: "Monat startet ruhig. Noch ist alles offen.",
+    sideJob: false,
+    sideJobUsed: false,
+    soldClothesCooldown: 0,
+    movedToWG: profile.living === "wg",
+    emergencyHelpUsed: false,
+    advisorHint: "",
+    fixedActionsUsedThisMonth: 0,
+    greenMonthsStreak: 0,
+    phaseKey: "survival",
+    achievements: new Set(),
+    recentDecisions: [],
+    recentEvents: [],
+    storyFlags: { trainingDone:false, rentRaised:false, jobChanceTaken:false, taxBack:false },
+    assets: initAssets(profile)
   };
 }
 
@@ -299,7 +627,8 @@ function readProfile(){
 
 function updateInterviewPreview(){
   const p = readProfile();
-  syncAvatarFromProfile(p);
+  state.profile = p;
+  state.avatarData = buildAvatarFromProfile(p);
   const comfort = initialComfort(p);
   const social = initialSocial(p);
   let mood = "neutral";
@@ -363,6 +692,36 @@ function computeQuest(g){
   const prog = clamp(g.buckets.cash / goal, 0, 1);
   el("gQuestText").textContent = `Notgroschen ≥ 1.000 € • aktuell: ${formatEUR(g.buckets.cash)}`;
   el("gQuestFill").style.width = `${Math.round(prog*100)}%`;
+}
+
+function addEffect(g, effect){
+  if(!g.effects) g.effects = [];
+  g.effects.push({ months:effect.months||1, money:effect.money||0, stability:effect.stability||0, comfort:effect.comfort||0, social:effect.social||0, name:effect.name||"Nachwirkung", text:effect.text||"" });
+}
+
+function processEffects(g){
+  if(!g.effects || !g.effects.length) return;
+  const next=[];
+  for(const fx of g.effects){
+    if(fx.money){ g.balance += fx.money; timelineItem(`Nachwirkung: ${fx.name}`, fx.money, fx.text || 'Eine frühere Entscheidung wirkt weiter.'); }
+    else if(fx.text){ timelineInfo(`Nachwirkung: ${fx.name}`, fx.text); }
+    g.stability = clamp(g.stability + (fx.stability||0), 0, 100);
+    g.comfort = clamp(g.comfort + (fx.comfort||0), 0, 100);
+    g.social = clamp(g.social + (fx.social||0), 0, 100);
+    fx.months -= 1;
+    if(fx.months > 0) next.push(fx);
+  }
+  g.effects = next;
+}
+
+function updateAdvisor(g){
+  const tips=[];
+  if(g.balance < 0) tips.push('Du bist im Minus. Prüfe direkt Abos, WG oder Nebenjob.');
+  if(g.variable.subs > 0) tips.push('Abos sind klein, nerven aber dauerhaft.');
+  if(g.buckets.cash < 300) tips.push('Im frühen Spiel ist Notgroschen wichtiger als ETF.');
+  if(g.loan.active) tips.push('Läuft ein Kredit, kann Umschulden sinnvoll sein.');
+  if(g.balance > 250 && g.buckets.cash < 600) tips.push('Du hast Luft. Nutze sie eher für Rücklage als für Extras.');
+  if(el('advisorText')) el('advisorText').textContent = tips[0] || 'Gerade keine rote Warnung. Halte den Kurs.';
 }
 
 // ---------- Receipt ----------
@@ -531,7 +890,7 @@ function renderStats(g){
   el("gIncome").textContent = formatEUR(g.income);
   el("gCash").textContent = formatEUR(g.buckets.cash);
   el("gEtf").textContent = formatEUR(g.buckets.etf);
-  el("gBalanceHint").textContent = g.balance < g.dispoFloor ? "Kontosperre (Limit erreicht)" : (g.balance < 0 ? "Im Minus" : "OK");
+  el("gBalanceHint").textContent = g.sceneNote || (g.balance < g.dispoFloor ? "Kontosperre (Limit erreicht)" : (g.balance < 0 ? "Im Minus" : "OK"));
   el("gStabilityFill").style.width = `${g.stability}%`;
   el("gComfortFill").style.width = `${g.comfort}%`;
   el("gSocialFill").style.width = `${g.social}%`;
@@ -542,80 +901,20 @@ function renderStats(g){
   el("inpEtf").value = g.plan.etf;
   el("loanStatus").textContent = g.loan.active ? `Aktiv: ${LOAN_TYPES[g.loan.type]?.label ?? "Kredit"} • Rate ${formatEUR(g.loan.rate)}/Monat • noch ${g.loan.monthsLeft} Monate` : "kein Kredit";
   el("goalNote").innerHTML = `Minus-Monate: <strong>${g.redMonths}</strong> • Dispo-Limit: <strong>${formatEUR(g.dispoFloor)}</strong> • Stabilität <strong>${g.stability}</strong> • Komfort <strong>${g.comfort}</strong> • Soziales <strong>${g.social}</strong>.`;
+  updateAdvisor(g);
 }
 
 function renderProgressDots(g){
   const root = el("progressDots");
   if(!root) return;
   root.innerHTML = "";
-  for(let i = 1; i <= 12; i++){
+  for(let i=1;i<=12;i++) {
     const dot = document.createElement("div");
     dot.className = "progressDot";
     if(i < g.month) dot.classList.add("done");
     if(i === g.month) dot.classList.add("current");
     root.appendChild(dot);
   }
-}
-
-function renderPhaseCard(g){
-  const phases = [
-    { name:"Überleben", desc:"Gerade geht es vor allem darum, nicht abzusaufen und kleine Löcher zu stopfen.", perk:"Kleine Ziele, hohe Aufmerksamkeit", next:"Stabilität" },
-    { name:"Stabilität", desc:"Du bekommst Struktur ins Budget. Nicht reich, aber kontrollierter.", perk:"Mehr Spielraum für Planung", next:"Sicherheit" },
-    { name:"Sicherheit", desc:"Rücklagen geben dir Luft. Fehler tun weh, werfen dich aber nicht sofort um.", perk:"Weniger Krisendruck", next:"Aufbau" },
-    { name:"Aufbau", desc:"Jetzt geht es nicht nur ums Überleben, sondern um echten Aufbau.", perk:"Langfristiger Vermögensaufbau", next:"—" },
-  ];
-
-  let phaseIndex = 0;
-  if(g.buckets.cash >= 300) phaseIndex = 1;
-  if(g.buckets.cash >= 800) phaseIndex = 2;
-  if(g.buckets.cash >= 1400 || (g.buckets.cash >= 900 && g.buckets.etf >= 300)) phaseIndex = 3;
-
-  const phase = phases[phaseIndex];
-  const nextTarget = phaseIndex === 0 ? 300 : phaseIndex === 1 ? 800 : phaseIndex === 2 ? 1400 : 1400;
-  const currentValue = phaseIndex === 3 ? nextTarget : Math.min(nextTarget, g.buckets.cash + Math.max(0, g.buckets.etf * 0.35));
-  const fill = phaseIndex === 3 ? 100 : Math.max(8, Math.min(100, Math.round((currentValue / nextTarget) * 100)));
-
-  if(el("phaseName")) el("phaseName").textContent = phase.name;
-  if(el("phaseDesc")) el("phaseDesc").textContent = phase.desc;
-  if(el("phasePerk")) el("phasePerk").textContent = phase.perk;
-  if(el("phaseMeta")) el("phaseMeta").textContent = `Nächste Phase: ${phase.next}`;
-  if(el("phaseFill")) el("phaseFill").style.width = `${fill}%`;
-}
-
-function renderAchievements(g){
-  const root = el("achievementsList");
-  const meta = el("achievementMeta");
-  if(!root) return;
-
-  const checks = [
-    { title:"Erster Puffer", text:"300 € Notgroschen erreicht.", on: g.buckets.cash >= 300 },
-    { title:"Starker Notgroschen", text:"1.000 € Rücklage aufgebaut.", on: g.buckets.cash >= 1000 },
-    { title:"Erster ETF-Schritt", text:"Zum ersten Mal investiert.", on: g.buckets.etf > 0 },
-    { title:"Saubere Serie", text:"3 Monate ohne Minus.", on: (g.greenMonthsStreak || 0) >= 3 },
-    { title:"Nebenjob-Mindset", text:"Zusätzliches Einkommen organisiert.", on: !!g.sideJobUsed },
-    { title:"Wohnkosten gedrückt", text:"In WG gezogen.", on: !!g.movedToWG },
-    { title:"Schuldenfrei", text:"Kein Kredit aktiv und trotzdem stabil.", on: !g.loan?.active && g.month >= 6 && g.balance >= 0 },
-    { title:"Halbzeit ohne Crash", text:"Nach 6 Monaten kein Minus-Monat.", on: g.month >= 6 && g.redMonths === 0 },
-  ];
-
-  root.innerHTML = "";
-  let unlocked = 0;
-
-  checks.forEach(item => {
-    if(item.on) unlocked++;
-    const row = document.createElement("div");
-    row.className = `achievementItem ${item.on ? "is-on" : ""}`;
-    row.innerHTML = `
-      <div class="achievementIcon">${item.on ? "✓" : "•"}</div>
-      <div>
-        <div class="achievementTitle">${item.title}</div>
-        <div class="achievementText">${item.text}</div>
-      </div>
-    `;
-    root.appendChild(row);
-  });
-
-  if(meta) meta.textContent = `${unlocked}/${checks.length} freigeschaltet`;
 }
 
 function renderAll(){
@@ -627,12 +926,14 @@ function renderAll(){
   renderReceipt(g);
   renderWarnings(g);
   renderProgressDots(g);
-  renderPhaseCard(g);
-  renderAchievements(g);
   renderCharts(g);
   renderGameAvatar();
-  if(el("btnRunMonth")) el("btnRunMonth").disabled = g.hasRunThisMonth;
-  if(el("btnNextMonth")) el("btnNextMonth").disabled = !g.hasRunThisMonth;
+  renderPhase(g);
+  renderAchievements(g);
+  renderActionCenter();
+  applyCrisisState(g);
+  el("btnRunMonth").disabled = g.hasRunThisMonth;
+  el("btnNextMonth").disabled = !g.hasRunThisMonth;
 }
 
 // ---------- Modals ----------
@@ -737,6 +1038,121 @@ function takeLoan(){
   renderAll();
 }
 
+// ---------- Action center ----------
+function toggleActionPanel(){
+  const body = el("actionBody");
+  const chev = el("actionChevron");
+  if(!body) return;
+  const open = !body.classList.contains("hidden");
+  body.classList.toggle("hidden", open);
+  if(chev) chev.textContent = open ? "▾" : "▴";
+}
+
+function actionUseGuard(limit=2){
+  const g = state.game;
+  if(!g) return false;
+  if(g.hasRunThisMonth){ toast("Aktion", "Zwischen zwei Monatsstarts kannst du keine Sofortaktion mehr nutzen."); return false; }
+  if(g.fixedActionsUsedThisMonth >= limit){ toast("Aktion", "Diesen Monat hast du schon genug Sofortaktionen genutzt."); return false; }
+  return true;
+}
+
+function cancelSubscriptions(){
+  const g = state.game;
+  if(!actionUseGuard()) return;
+  if(g.variable.subs <= 0){ toast("Abos", "Du hast keine Abos mehr."); return; }
+  const saved = Math.min(18, g.variable.subs);
+  g.variable.subs = Math.max(0, g.variable.subs - saved);
+  g.fixedActionsUsedThisMonth += 1;
+  g.stability = clamp(g.stability + 2, 0, 100);
+  g.comfort = clamp(g.comfort - 1, 0, 100);
+  timelineItem("Abos gekündigt", +saved, "Du hast Verträge überprüft und laufende Kosten gesenkt.");
+  renderAll();
+}
+function sellClothes(){
+  const g = state.game;
+  if(!actionUseGuard()) return;
+  if(g.soldClothesCooldown > 0){ toast("Verkaufen", `Gerade hast du nichts Sinnvolles mehr zum Verkaufen. Noch ${g.soldClothesCooldown} Monat(e).`); return; }
+  g.balance += 90;
+  g.soldClothesCooldown = 3;
+  g.fixedActionsUsedThisMonth += 1;
+  g.comfort = clamp(g.comfort - 1, 0, 100);
+  timelineItem("Klamotten verkauft", +90, "Second-Hand Verkauf bringt kurzfristig Luft.");
+  renderAll();
+}
+function startSideJob(){
+  const g = state.game;
+  if(!actionUseGuard(1)) return;
+  if(g.sideJob || g.sideJobUsed){ toast("Nebenjob", "Du hast diese Option bereits genutzt."); return; }
+  g.sideJob = true;
+  g.sideJobUsed = true;
+  g.income += 140;
+  g.fixedActionsUsedThisMonth += 1;
+  g.comfort = clamp(g.comfort - 7, 0, 100);
+  g.social = clamp(g.social - 5, 0, 100);
+  addEffect(g,{ name:"Erschöpfung", months:3, comfort:-2, social:-1, text:"Mehr Geld, aber weniger Energie und Zeit." });
+  timelineInfo("Nebenjob gestartet", "Mehr Geld pro Monat, aber deutlich weniger Freizeit.");
+  renderAll();
+}
+function moveToWG(){
+  const g = state.game;
+  if(!actionUseGuard(1)) return;
+  if(g.movedToWG || state.profile?.living === "wg"){ toast("WG", "Du wohnst bereits in einer WG."); return; }
+  const moveCost = 240;
+  g.balance -= moveCost;
+  g.fixed.rent = LIVING.wg.rent;
+  g.fixed.utilities = LIVING.wg.utilities;
+  g.fixed.internet = LIVING.wg.internet;
+  g.movedToWG = true;
+  if(state.profile) state.profile.living = "wg";
+  state.avatarData = buildAvatarFromProfile(state.profile || readProfile());
+  g.fixedActionsUsedThisMonth += 1;
+  g.comfort = clamp(g.comfort - 4, 0, 100);
+  g.social = clamp(g.social + 2, 0, 100);
+  timelineItem("In WG gezogen", -moveCost, "Umzug kostet erst einmal Geld, senkt aber künftig die Wohnkosten.");
+  renderAll();
+}
+function refinanceLoan(){
+  const g = state.game;
+  if(!actionUseGuard()) return;
+  if(!g.loan.active){ toast("Kredit", "Kein Kredit aktiv."); return; }
+  const oldRate = g.loan.rate;
+  g.loan.apr = Math.max(2.5, g.loan.apr - 1.5);
+  g.loan.rate = calcMonthlyRate(g.loan.principal, Math.max(1, g.loan.monthsLeft), g.loan.apr);
+  g.fixedActionsUsedThisMonth += 1;
+  g.stability = clamp(g.stability + 3, 0, 100);
+  timelineItem("Kredit umgeschuldet", Math.round(oldRate - g.loan.rate), "Die Rate sinkt etwas. Nicht magisch, aber hilfreich.");
+  renderAll();
+}
+function emergencyHelp(){
+  const g = state.game;
+  if(!g) return;
+  if(g.emergencyHelpUsed){ toast("Hilfe", "Diese Hilfe gab es schon."); return; }
+  if(!(g.balance < 0 || g.redMonths >= 2)){ toast("Hilfe", "Diese Notfallhilfe gibt es erst, wenn es wirklich eng wird."); return; }
+  g.emergencyHelpUsed = true;
+  g.balance += 220;
+  g.stability = clamp(g.stability - 1, 0, 100);
+  timelineItem("Notfallhilfe", +220, "Familie oder Umfeld helfen einmal aus.");
+  renderAll();
+}
+function renderActionCenter(){
+  const g = state.game;
+  if(!g) return;
+  if(el("mqActionMeta")) el("mqActionMeta").textContent = g.hasRunThisMonth ? "Aktionen sind wieder vor dem nächsten Monatsstart verfügbar" : `Aktionen vor Monat ${g.month} • genutzt: ${g.fixedActionsUsedThisMonth}/2`;
+  const setDisabled=(id,disabled)=>{ const btn=el(id); if(btn) btn.disabled=!!disabled; };
+  setDisabled("actCancelSubs", g.hasRunThisMonth || g.variable.subs<=0 || g.fixedActionsUsedThisMonth>=2);
+  setDisabled("actSellClothes", g.hasRunThisMonth || g.soldClothesCooldown>0 || g.fixedActionsUsedThisMonth>=2);
+  setDisabled("actSideJob", g.hasRunThisMonth || g.sideJob || g.sideJobUsed || g.fixedActionsUsedThisMonth>=1);
+  setDisabled("actWG", g.hasRunThisMonth || g.movedToWG || state.profile?.living === "wg" || g.fixedActionsUsedThisMonth>=1);
+  setDisabled("actRefi", g.hasRunThisMonth || !g.loan.active || g.fixedActionsUsedThisMonth>=2);
+  setDisabled("actEmergency", g.hasRunThisMonth || !(g.balance<0 || g.redMonths>=2) || g.emergencyHelpUsed);
+}
+
+function applyCrisisState(g){
+  const root = el("screenGame");
+  if(!root) return;
+  root.classList.toggle("is-crisis", g.balance < 0 || g.redMonths >= 2);
+}
+
 // ---------- Decisions / events ----------
 function impactPills({money=0, stability=0, comfort=0, social=0}){
   const mk = (cls,text)=>({cls,text});
@@ -758,60 +1174,293 @@ function applyOption(g, opt, title){
 
 const DECISIONS = [
   {
-    title:"Essen & Trinken",
-    text:"Du merkst: Essen kippt den Monat. Was machst du?",
-    a:{ label:"Meal Prep", meta:"Planen und vorkochen.", money:+70, stability:+6, comfort:-1, social:0 },
-    b:{ label:"To-Go / Lieferung", meta:"Bequemer, aber teurer.", money:-70, stability:-2, comfort:+2, social:+1 },
+    id:"groceries",
+    title:"Wocheneinkauf",
+    text:"Beim Einkaufen merkst du: Mit Planung wird es deutlich günstiger als mit vielen kleinen Spontankäufen.",
+    weight:g=> g.variable.food >= 280 ? 4 : 2,
+    a:{ label:"Mit Liste einkaufen", meta:"Weniger Impulskäufe, etwas mehr Planung.", money:+45, stability:+4, comfort:-1, social:0, effect:{ name:"Geplanter Einkauf", months:1, money:+10, stability:+1, text:"Du hast einen Teil der Woche besser im Griff." }, scene:"Alltag wirkt sortierter. Kein Glamour, aber spürbar vernünftiger." },
+    b:{ label:"Zwischendurch holen", meta:"Bequemer, aber teurer.", money:-35, stability:-2, comfort:+1, social:0, effect:{ name:"Spontane Kleinkäufe", months:1, money:-10, stability:-1, text:"Viele kleine Beträge läppern sich." }, scene:"Nicht dramatisch – aber genau so rutscht Geld oft weg." }
   },
   {
-    title:"Freizeit",
-    text:"Freunde fragen: Kino heute?",
-    a:{ label:"Mitgehen", meta:"Kostet, aber du bist dabei.", money:-25, stability:-1, comfort:+1, social:+6 },
-    b:{ label:"Absagen", meta:"Du sparst, bist aber weniger dabei.", money:+10, stability:+2, comfort:0, social:-4 },
+    id:"lunch",
+    title:"Mittag unterwegs",
+    text:"Du bist unterwegs und hast Hunger. Nimmst du etwas von zu Hause mit oder kaufst du spontan?",
+    weight:g=> g.month <= 6 ? 3 : 2,
+    a:{ label:"Snack von zu Hause", meta:"Kleiner Aufwand, günstiger.", money:+18, stability:+2, comfort:-1, social:0, scene:"Kleinigkeit gespart – unspektakulär, aber genau das hilft auf Dauer." },
+    b:{ label:"Schnell etwas kaufen", meta:"Einfach, aber deutlich teurer.", money:-18, stability:-1, comfort:+1, social:0, scene:"Praktisch – und wieder ein kleiner Betrag weg." }
   },
   {
-    title:"Abos prüfen",
-    text:"Du merkst: Abos summieren sich.",
-    a:{ label:"Kündigen", meta:"2 Abos weg.", money:+18, stability:+3, comfort:-2, social:-1 },
-    b:{ label:"Behalten", meta:"Bleibt bequem, kostet aber weiter.", money:0, stability:-1, comfort:+1, social:0 },
+    id:"freizeit",
+    title:"Wochenende mit Freunden",
+    text:"Freunde fragen, ob du am Wochenende mitkommst. Es wäre schön – aber eben nicht gratis.",
+    weight:g=> g.social < 55 ? 4 : 3,
+    a:{ label:"Mitgehen", meta:"Kostet etwas, tut sozial aber gut.", money:-28, stability:-1, comfort:+1, social:+6, effect:{ name:"Sozialer Rückenwind", months:1, social:+2, text:"Du fühlst dich noch etwas verbundener." }, scene:"Teurer Abend, aber sozial ein echter Pluspunkt." },
+    b:{ label:"Diesmal absagen", meta:"Spart Geld, ist aber schade.", money:+10, stability:+2, comfort:0, social:-4, effect:{ name:"Rückzug", months:1, social:-2, text:"Weniger Teilhabe wirkt oft noch kurz nach." }, scene:"Finanziell vernünftig, emotional eher dünn." }
   },
+  {
+    id:"subscriptions",
+    title:"Verträge & Abos",
+    text:"Beim Blick aufs Konto fällt dir auf, dass mehrere kleine Abbuchungen unnötig nerven.",
+    weight:g=> g.variable.subs > 0 ? 4 : 1,
+    can:g=> g.variable.subs > 0,
+    a:{ label:"Etwas kündigen", meta:"Weniger Komfort, mehr Überblick.", money:+18, stability:+3, comfort:-2, social:-1, effect:{ name:"Dauerhaft aufgeräumt", months:3, money:+12, stability:+1, text:"Weniger laufende Verträge entlasten auch die nächsten Monate." }, scene:"Weniger Komfort, aber deutlich klarerer Monatsplan." },
+    b:{ label:"Weiterlaufen lassen", meta:"Bequem, aber dauerhaft teuer.", money:0, stability:-1, comfort:+1, social:0, effect:{ name:"Abo zieht weiter", months:3, money:-12, stability:-1, text:"Kleine Beträge nerven auch später." }, scene:"Es bleibt bequem – und dauerhaft etwas enger." }
+  },
+  {
+    id:"commute",
+    title:"Arbeitsweg",
+    text:"Du überlegst, ob du den Alltag etwas bequemer machst oder beim günstigeren Weg bleibst.",
+    weight:g=> g.variable.mobility >= 69 ? 2 : 1,
+    a:{ label:"Praktischer fahren", meta:"Weniger Stress, etwas teurer.", money:-15, stability:0, comfort:+3, social:0, scene:"Der Alltag läuft glatter, aber eben nicht gratis." },
+    b:{ label:"Günstig bleiben", meta:"Mehr Disziplin, weniger Komfort.", money:+10, stability:+2, comfort:-2, social:0, scene:"Nicht bequem, aber genau so entstehen Puffer." }
+  },
+  {
+    id:"shopping",
+    title:"Spontankauf",
+    text:"Du siehst etwas, das du eigentlich nicht brauchst, aber gerade trotzdem gern hättest.",
+    weight:g=> g.variable.shop >= 75 ? 3 : 1,
+    a:{ label:"Nicht kaufen", meta:"Kurz vernünftig sein.", money:+20, stability:+2, comfort:0, social:0, scene:"Kein Kick, aber ein klarer Sieg für dein Budget." },
+    b:{ label:"Gönnen", meta:"Kurz nice, später egal.", money:-45, stability:-2, comfort:+2, social:+1, scene:"Fühlt sich kurz gut an – und ist genau die Art Ausgabe, die schwer auffällt." }
+  },
+  {
+    id:"energy",
+    title:"Strom & Heizung",
+    text:"Du merkst, dass kleine Gewohnheiten im Alltag die Nebenkosten beeinflussen.",
+    weight:g=> g.fixed.utilities >= 110 ? 2 : 1,
+    a:{ label:"Bewusster werden", meta:"Etwas nerviger, aber sinnvoll.", money:+12, stability:+2, comfort:-1, social:0, effect:{ name:"Sparsamer Alltag", months:2, money:+6, text:"Kleine Gewohnheiten drücken die Kosten leicht." }, scene:"Nicht spektakulär, aber genau solche Details machen einen Unterschied." },
+    b:{ label:"Laufen lassen", meta:"Bequemer, aber teurer.", money:-8, stability:-1, comfort:+1, social:0, scene:"Bequem – und wieder etwas Luft verschenkt." }
+  },
+  {
+    id:"health",
+    title:"Körper & Pause",
+    text:"Du merkst, dass du eigentlich mal eine ruhigere Woche oder etwas für dich bräuchtest.",
+    weight:g=> g.comfort < 50 ? 3 : 1,
+    a:{ label:"Etwas für dich tun", meta:"Kleiner Betrag, aber tut gut.", money:-20, stability:+1, comfort:+3, social:0, scene:"Nicht direkt finanziell clever – aber manchmal trotzdem die bessere Entscheidung." },
+    b:{ label:"Weiter durchziehen", meta:"Spart Geld, zehrt aber.", money:+5, stability:0, comfort:-2, social:0, scene:"Billiger – aber du merkst, dass Energie auch ein Faktor ist." }
+  }
 ];
 
 const EVENTS = [
   {
-    title:"Handy kaputt",
-    text:"Dein Handy fällt runter. Das musst du jetzt beachten.",
+    id:"phone_break",
+    title:"Handy macht Probleme",
+    text:"Display, Akku oder Mikrofon – dein Handy läuft gerade nicht mehr rund.",
+    can:g=> !!g.assets?.hasPhone,
+    weight:g=> g.assets?.phoneState === "wacklig" ? 0.6 : 1.2,
     after(g){
       g.insuranceHints.add("Handy: Eine Versicherung kann helfen, ist aber nicht immer automatisch sinnvoll.");
       openChoiceModal({
-        title:"Handy kaputt",
-        text:"Was machst du?",
+        title:"Handy macht Probleme",
+        text:"Du musst nicht automatisch ein neues kaufen. Was ist für deine Lage realistisch?",
         options:[
-          { label:"Reparieren", meta:"Billiger, aber nicht perfekt.", impacts:impactPills({money:-120, stability:-1, comfort:-1, social:-1}), onPick:()=>{ applyOption(g, {label:"Reparieren", meta:"Billiger.", money:-120, stability:-1, comfort:-1, social:-1}, "Ereignis"); finalizeMonth(g); } },
-          { label:"Neu kaufen", meta:"Teurer, aber bequemer.", impacts:impactPills({money:-420, stability:-2, comfort:+2, social:+2}), onPick:()=>{ applyOption(g, {label:"Neu kaufen", meta:"Teurer.", money:-420, stability:-2, comfort:+2, social:+2}, "Ereignis"); finalizeMonth(g); } }
+          { label:"Erstmal weiter nutzen", meta:"Nervig, aber erstmal kein direkter Geldschaden.", impacts:impactPills({money:0, stability:-1, comfort:-2, social:-1}), onPick:()=>{ g.assets.phoneState = "wacklig"; applyOption(g, {label:"Weiter nutzen", meta:"Kurz gespart.", money:0, stability:-1, comfort:-2, social:-1, effect:{ name:"Nerviges Handy", months:1, comfort:-1, text:"Ein kaputtes Handy kann den Alltag weiter nerven." }, scene:"Du sparst sofort Geld, kaufst dir aber Alltagstress ein."}, "Ereignis"); rememberRecent(g.recentEvents, "phone_break"); finalizeMonth(g); } },
+          { label:"Günstig reparieren", meta:"Vernünftig und deutlich realistischer als direkt neu.", impacts:impactPills({money:-90, stability:-1, comfort:+1, social:0}), onPick:()=>{ g.assets.phoneState = "ok"; applyOption(g, {label:"Reparieren", meta:"Solide Zwischenlösung.", money:-90, stability:-1, comfort:+1, social:0, scene:"Nicht perfekt, aber genau so lösen viele das im echten Leben."}, "Ereignis"); rememberRecent(g.recentEvents, "phone_break"); finalizeMonth(g); } },
+          { label:"Altes Ersatzhandy", meta:"Nicht schön, aber günstig.", impacts:impactPills({money:-35, stability:0, comfort:-1, social:-1}), onPick:()=>{ g.assets.phoneState = "ok"; applyOption(g, {label:"Ersatzgerät", meta:"Gebraucht oder alt aus der Schublade.", money:-35, stability:0, comfort:-1, social:-1, scene:"Pragmatisch. Nicht cool, aber machbar."}, "Ereignis"); rememberRecent(g.recentEvents, "phone_break"); finalizeMonth(g); } },
+          { label:"Ohne Handy weitermachen", meta:"Spart Geld, macht den Alltag aber härter.", impacts:impactPills({money:0, stability:-2, comfort:-3, social:-2}), onPick:()=>{ g.assets.hasPhone = false; g.assets.phoneState = "none"; applyOption(g, {label:"Ohne Handy", meta:"Radikale Sparlösung.", money:0, stability:-2, comfort:-3, social:-2, effect:{ name:"Ohne Smartphone", months:2, comfort:-1, social:-1, text:"Ohne Handy wird vieles umständlicher." }, scene:"Geht theoretisch – fühlt sich aber schnell sperrig an."}, "Ereignis"); rememberRecent(g.recentEvents, "phone_break"); finalizeMonth(g); } }
         ]
       });
     }
   },
   {
-    title:"Bonus",
-    text:"Du bekommst einen kleinen Bonus.",
+    id:"used_phone_offer",
+    title:"Gebrauchtes Handy-Angebot",
+    text:"Jemand im Umfeld bietet dir ein gebrauchtes Handy günstig an.",
+    can:g=> !g.assets?.hasPhone,
+    weight:g=> 1.8,
     after(g){
       openChoiceModal({
-        title:"Bonus",
-        text:"Was machst du mit dem Extra-Geld?",
+        title:"Gebrauchtes Handy-Angebot",
+        text:"Willst du wieder ein einfaches Gerät haben?",
         options:[
-          { label:"Einfach behalten", meta:"Mehr Luft auf dem Konto.", impacts:impactPills({money:+120, stability:+2, comfort:+1, social:+1}), onPick:()=>{ applyOption(g, {label:"Behalten", meta:"Mehr Luft.", money:+120, stability:+2, comfort:+1, social:+1}, "Ereignis"); finalizeMonth(g); } },
-          { label:"Teil sparen", meta:"Etwas direkt in den Notgroschen.", impacts:impactPills({money:+120, stability:+3, comfort:0, social:0}), onPick:()=>{ applyOption(g, {label:"Teil sparen", meta:"Du legst direkt was weg.", money:+120, stability:+3, comfort:0, social:0}, "Ereignis"); g.buckets.cash += 80; g.balance -= 80; timelineItem("Bonus → Notgroschen", -80, "Direkt Rücklage erhöht."); finalizeMonth(g); } }
+          { label:"Ja, nehme ich", meta:"Nicht neu, aber alltagstauglich.", impacts:impactPills({money:-60, stability:+1, comfort:+2, social:+2}), onPick:()=>{ g.assets.hasPhone = true; g.assets.phoneState = "ok"; applyOption(g, {label:"Gebrauchtes Handy", meta:"Kleine Anschaffung.", money:-60, stability:+1, comfort:+2, social:+2, scene:"Wieder erreichbar zu sein entspannt den Alltag sofort."}, "Ereignis"); rememberRecent(g.recentEvents, "used_phone_offer"); finalizeMonth(g); } },
+          { label:"Nein, noch nicht", meta:"Du bleibst erstmal ohne Gerät.", impacts:impactPills({money:0, stability:0, comfort:-1, social:-1}), onPick:()=>{ applyOption(g, {label:"Weiter ohne Handy", meta:"Noch etwas Geld gespart.", money:0, stability:0, comfort:-1, social:-1, scene:"Spart Geld – kostet aber weiter Komfort."}, "Ereignis"); rememberRecent(g.recentEvents, "used_phone_offer"); finalizeMonth(g); } }
         ]
       });
+    }
+  },
+  {
+    id:"bike_repair",
+    title:"Fahrrad reparieren",
+    text:"Schlauch, Bremse oder Licht – dein Fahrrad braucht Zuwendung.",
+    can:g=> !!g.assets?.hasBike,
+    weight:g=> 1.2,
+    after(g){
+      openChoiceModal({
+        title:"Fahrrad reparieren",
+        text:"Was ist für dich gerade realistisch?",
+        options:[
+          { label:"Selbst flicken", meta:"Günstiger, aber etwas Aufwand.", impacts:impactPills({money:-18, stability:+1, comfort:-1, social:0}), onPick:()=>{ applyOption(g,{label:"Selbst repariert", meta:"Material gekauft.", money:-18, stability:+1, comfort:-1, social:0, scene:"Kleine Sache, aber genau solche Beträge gehören zum Alltag."},"Ereignis"); rememberRecent(g.recentEvents, "bike_repair"); finalizeMonth(g);} },
+          { label:"Werkstatt", meta:"Bequemer, aber teurer.", impacts:impactPills({money:-55, stability:0, comfort:+1, social:0}), onPick:()=>{ applyOption(g,{label:"Werkstatt", meta:"Schneller erledigt.", money:-55, stability:0, comfort:+1, social:0, scene:"Bequem gelöst – der Monat merkt es trotzdem."},"Ereignis"); rememberRecent(g.recentEvents, "bike_repair"); finalizeMonth(g);} }
+        ]
+      });
+    }
+  },
+  {
+    id:"car_followup",
+    title:"Auto kostet wieder",
+    text:"Kleine Autokosten melden sich: Tanken, Parken oder etwas in der Werkstatt.",
+    can:g=> !!g.assets?.hasCar,
+    weight:g=> 1.4,
+    after(g){
+      openChoiceModal({
+        title:"Auto kostet wieder",
+        text:"Wie gehst du damit um?",
+        options:[
+          { label:"Zahlen und weiter", meta:"Nervig, aber nötig.", impacts:impactPills({money:-65, stability:-1, comfort:+1, social:0}), onPick:()=>{ applyOption(g,{label:"Autokosten bezahlt", meta:"Läuft weiter.", money:-65, stability:-1, comfort:+1, social:0, scene:"Das Auto bleibt praktisch – und eben teuer."},"Ereignis"); rememberRecent(g.recentEvents, "car_followup"); finalizeMonth(g);} },
+          { label:"Fahrten reduzieren", meta:"Spart Geld, ist aber unbequemer.", impacts:impactPills({money:-20, stability:+1, comfort:-2, social:0}), onPick:()=>{ applyOption(g,{label:"Autofahrten reduziert", meta:"Etwas eingespart.", money:-20, stability:+1, comfort:-2, social:0, effect:{ name:"Weniger Autofahrten", months:1, money:+20, comfort:-1, text:"Weniger Fahrten sparen noch etwas Geld." }, scene:"Spürbar günstiger – aber eben auch weniger bequem."},"Ereignis"); rememberRecent(g.recentEvents, "car_followup"); finalizeMonth(g);} }
+        ]
+      });
+    }
+  },
+  {
+    id:"prescription",
+    title:"Apotheke & Gesundheit",
+    text:"Du brauchst etwas aus der Apotheke oder musst zuzahlen. Nicht riesig, aber es kommt ungelegen.",
+    weight:g=> 2,
+    after(g){
+      openChoiceModal({
+        title:"Apotheke & Gesundheit",
+        text:"Wie gehst du damit um?",
+        options:[
+          { label:"Direkt kaufen", meta:"Vernünftig, aber kostet.", impacts:impactPills({money:-28, stability:+1, comfort:+1, social:0}), onPick:()=>{ applyOption(g, {label:"Direkt kaufen", meta:"Nicht schön, aber sinnvoll.", money:-28, stability:+1, comfort:+1, social:0, scene:"Gesundheit ist selten optional – auch wenn es gerade nervt."}, "Ereignis"); rememberRecent(g.recentEvents, "prescription"); finalizeMonth(g); } },
+          { label:"Noch etwas schieben", meta:"Spart kurz Geld, fühlt sich aber nicht gut an.", impacts:impactPills({money:+0, stability:-1, comfort:-2, social:0}), onPick:()=>{ applyOption(g, {label:"Verschieben", meta:"Kurz gespart.", money:0, stability:-1, comfort:-2, social:0, scene:"Nicht jede Ersparnis fühlt sich am Ende gut an."}, "Ereignis"); rememberRecent(g.recentEvents, "prescription"); finalizeMonth(g); } }
+        ]
+      });
+    }
+  },
+  {
+    id:"gift",
+    title:"Geschenk / Sammeln",
+    text:"Im Umfeld steht ein Geburtstag, Abschied oder gemeinsames Geschenk an.",
+    weight:g=> 2,
+    after(g){
+      openChoiceModal({
+        title:"Geschenk / Sammeln",
+        text:"Wie viel gibst du?",
+        options:[
+          { label:"Kleiner Beitrag", meta:"Du bist dabei, aber bleibst im Rahmen.", impacts:impactPills({money:-12, stability:0, comfort:0, social:+2}), onPick:()=>{ applyOption(g, {label:"Kleiner Beitrag", meta:"Fair und machbar.", money:-12, stability:0, comfort:0, social:+2, scene:"Nicht viel Geld – aber sozial wichtig."}, "Ereignis"); rememberRecent(g.recentEvents, "gift"); finalizeMonth(g); } },
+          { label:"Mehr geben", meta:"Großzügiger, aber enger für dich.", impacts:impactPills({money:-30, stability:-1, comfort:0, social:+4}), onPick:()=>{ applyOption(g, {label:"Mehr geben", meta:"Großzügig.", money:-30, stability:-1, comfort:0, social:+4, scene:"Schön für die Gruppe – für dein Konto weniger."}, "Ereignis"); rememberRecent(g.recentEvents, "gift"); finalizeMonth(g); } }
+        ]
+      });
+    }
+  },
+  {
+    id:"utility_surcharge",
+    title:"Nachzahlung",
+    text:"Eine Nachzahlung oder eine unerwartete Abbuchung trifft den Monat.",
+    weight:g=> g.month >= 3 ? 2 : 1,
+    after(g){
+      applyOption(g, {label:"Nachzahlung", meta:"Leider sofort fällig.", money:-85, stability:-2, comfort:-1, social:0, scene:"Kein Drama, aber genau solche Dinge nerven echte Budgets."}, "Ereignis");
+      rememberRecent(g.recentEvents, "utility_surcharge");
+      finalizeMonth(g);
+    }
+  },
+  {
+    id:"bike_repair",
+    title:"Fahrrad reparieren",
+    text:"Dein Fahrrad braucht eine kleine Reparatur.",
+    can:g=> state.profile?.lifeMobility === "bike",
+    weight:g=> 3,
+    after(g){
+      applyOption(g, {label:"Reparatur", meta:"Nervig, aber nötig.", money:-45, stability:-1, comfort:-1, social:0, scene:"Bei günstiger Mobilität ist genau das der Haken: manchmal steckt Geld in Reparaturen."}, "Ereignis");
+      rememberRecent(g.recentEvents, "bike_repair");
+      finalizeMonth(g);
+    }
+  },
+  {
+    id:"car_cost",
+    title:"Auto kostet wieder",
+    text:"Beim Auto kommt etwas dazu: kleine Reparatur, Versicherung oder Werkstattkram.",
+    can:g=> state.profile?.lifeMobility === "car",
+    weight:g=> 4,
+    after(g){
+      openChoiceModal({
+        title:"Auto kostet wieder",
+        text:"Wie gehst du damit um?",
+        options:[
+          { label:"Direkt machen lassen", meta:"Teuer, aber safe.", impacts:impactPills({money:-160, stability:-1, comfort:+1, social:0}), onPick:()=>{ applyOption(g, {label:"Werkstatt", meta:"Direkt gelöst.", money:-160, stability:-1, comfort:+1, social:0, scene:"Genau deshalb ist ein Auto oft teuer, obwohl es bequem ist."}, "Ereignis"); rememberRecent(g.recentEvents, "car_cost"); finalizeMonth(g); } },
+          { label:"Nur das Nötigste", meta:"Etwas günstiger, aber nicht ideal.", impacts:impactPills({money:-95, stability:-1, comfort:-1, social:0}), onPick:()=>{ applyOption(g, {label:"Nötigste", meta:"Kurzfristig günstiger.", money:-95, stability:-1, comfort:-1, social:0, scene:"Du rettest den Monat etwas, aber nicht komplett entspannt."}, "Ereignis"); rememberRecent(g.recentEvents, "car_cost"); finalizeMonth(g); } }
+        ]
+      });
+    }
+  },
+  {
+    id:"quiet_month",
+    title:"Ruhiger Monat",
+    text:"Ausnahmsweise passiert nichts Besonderes. Das ist fast schon ein Geschenk.",
+    weight:g=> 1,
+    after(g){
+      applyOption(g, {label:"Ruhiger Monat", meta:"Keine Sonderbelastung.", money:0, stability:+2, comfort:+1, social:+1, scene:"Genau solche Monate braucht man, um wieder Luft zu bekommen."}, "Ereignis");
+      rememberRecent(g.recentEvents, "quiet_month");
+      finalizeMonth(g);
+    }
+  },
+  {
+    id:"refund",
+    title:"Rückerstattung",
+    text:"Eine kleine Rückerstattung oder Gutschrift landet auf deinem Konto.",
+    weight:g=> 0.6,
+    after(g){
+      openChoiceModal({
+        title:"Rückerstattung",
+        text:"Mit dem kleinen Extra lässt sich sinnvoll etwas machen.",
+        options:[
+          { label:"Auf dem Konto lassen", meta:"Einfach etwas mehr Luft.", impacts:impactPills({money:+65, stability:+1, comfort:+1, social:0}), onPick:()=>{ applyOption(g, {label:"Behalten", meta:"Mehr Luft.", money:+65, stability:+1, comfort:+1, social:0, scene:"Nicht spektakulär, aber gerade deshalb angenehm."}, "Ereignis"); rememberRecent(g.recentEvents, "refund"); finalizeMonth(g); } },
+          { label:"Direkt zurücklegen", meta:"Unaufgeregt vernünftig.", impacts:impactPills({money:+65, stability:+2, comfort:0, social:0}), onPick:()=>{ applyOption(g, {label:"Zurücklegen", meta:"Direkt gesichert.", money:+65, stability:+2, comfort:0, social:0, scene:"Kleine Beträge bewusst sichern ist oft stärker, als man denkt."}, "Ereignis"); g.buckets.cash += 50; g.balance -= 50; timelineItem("Rückerstattung → Notgroschen", -50, "Direkt Rücklage erhöht."); rememberRecent(g.recentEvents, "refund"); finalizeMonth(g); } }
+        ]
+      });
+    }
+  },
+  {
+    id:"overtime",
+    title:"Überstunden / Extra-Schicht",
+    text:"Du bekommst überraschend etwas zusätzlich ausgezahlt.",
+    weight:g=> 0.5,
+    after(g){
+      applyOption(g, {label:"Extra-Auszahlung", meta:"Mal etwas Positives.", money:+90, stability:+2, comfort:-1, social:0, scene:"Schön – aber eher Ausnahme als Regel."}, "Ereignis");
+      rememberRecent(g.recentEvents, "overtime");
+      finalizeMonth(g);
     }
   }
 ];
 
-function maybePick(arr, chance){
+function rememberRecent(list, key, max=3){
+  if(!Array.isArray(list)) return;
+  list.push(key);
+  while(list.length > max) list.shift();
+}
+
+function pickWeighted(items, g, recentKeys=[]){
+  let eligible = items.filter(item => !item.can || item.can(g));
+  if(recentKeys?.length){
+    const filtered = eligible.filter(item => !recentKeys.includes(item.id));
+    if(filtered.length >= Math.max(3, Math.ceil(eligible.length * 0.5))) eligible = filtered;
+  }
+  if(!eligible.length) return null;
+  const weighted = eligible.map(item => ({ item, weight: Math.max(0.1, typeof item.weight === "function" ? item.weight(g) : (item.weight || 1)) }));
+  const total = weighted.reduce((sum, entry) => sum + entry.weight, 0);
+  let roll = Math.random() * total;
+  for(const entry of weighted){
+    roll -= entry.weight;
+    if(roll <= 0) return entry.item;
+  }
+  return weighted[weighted.length - 1].item;
+}
+
+function pickDecision(g){
+  const d = pickWeighted(DECISIONS, g, g.recentDecisions);
+  if(d) rememberRecent(g.recentDecisions, d.id, 3);
+  return d;
+}
+
+function pickNormalEvent(g){
+  const ev = pickWeighted(EVENTS, g, g.recentEvents);
+  return ev;
+}
+
+function maybePick(arr, chance, g, recentKeys=[]){
   if(Math.random() > chance) return null;
-  return arr[Math.floor(Math.random()*arr.length)];
+  return pickWeighted(arr, g, recentKeys);
 }
 
 // ---------- ETF ----------
@@ -836,6 +1485,8 @@ function applyEtfMovement(g){
 function runMonth(){
   const g = state.game;
   if(g.hasRunThisMonth) return;
+  g.fixedActionsUsedThisMonth = 0;
+  if(g.soldClothesCooldown > 0) g.soldClothesCooldown -= 1;
   timelineClear();
   timelineInfo(`Monat ${g.month} startet`, "Du siehst jetzt Schritt für Schritt, wo das Geld hingeht.");
   g.balance += g.income;
@@ -880,11 +1531,14 @@ function runMonth(){
   }
   if(g.balance > 0){
     const wantSub = g.buckets.subs.reduce((s,b)=> s + (b.plan || 0), 0);
-    const want = g.plan.cash + g.plan.etf + wantSub;
+    const safeCash = g.plan.cash;
+    const safeEtf = g.buckets.cash < 300 ? Math.floor(g.plan.etf * 0.25) : g.plan.etf;
+    const want = safeCash + safeEtf + wantSub;
     const can = Math.max(0, g.balance);
-    const factor = want > 0 ? Math.min(1, can / want) : 0;
-    const payCash = Math.floor(g.plan.cash * factor);
-    const payEtf = Math.floor(g.plan.etf * factor);
+    const cappedWant = Math.min(want, Math.floor(g.balance * 0.32));
+    const factor = cappedWant > 0 ? Math.min(1, can / cappedWant) : 0;
+    const payCash = Math.floor(safeCash * factor);
+    const payEtf = Math.floor(safeEtf * factor);
     let paidSubs = 0;
     for(const b of g.buckets.subs){
       const pay = Math.floor((b.plan || 0) * factor);
@@ -906,21 +1560,28 @@ function runMonth(){
     g.lastReceipt.afterPlan = g.balance;
   }
   renderAll();
-  const d = DECISIONS[(g.month - 1) % DECISIONS.length];
-  openChoiceModal({
-    title: d.title,
-    text: d.text,
-    options: [
-      { label: d.a.label, meta: d.a.meta, impacts: impactPills(d.a), onPick: ()=>{ applyOption(g, d.a, "Entscheidung"); continueAfterDecision(g); } },
-      { label: d.b.label, meta: d.b.meta, impacts: impactPills(d.b), onPick: ()=>{ applyOption(g, d.b, "Entscheidung"); continueAfterDecision(g); } }
-    ]
-  });
+  const d = pickDecision(g);
+  if(d){
+    openChoiceModal({
+      title: d.title,
+      text: d.text,
+      options: [
+        { label: d.a.label, meta: d.a.meta, impacts: impactPills(d.a), onPick: ()=>{ applyOption(g, d.a, "Entscheidung"); continueAfterDecision(g); } },
+        { label: d.b.label, meta: d.b.meta, impacts: impactPills(d.b), onPick: ()=>{ applyOption(g, d.b, "Entscheidung"); continueAfterDecision(g); } }
+      ]
+    });
+  } else {
+    finalizeMonth(g);
+    return;
+  }
   g.hasRunThisMonth = true;
   el("btnRunMonth").disabled = true;
 }
 
 function continueAfterDecision(g){
-  const ev = maybePick(EVENTS, 0.50);
+  if(maybeRunStoryEvent(g)) return;
+  const chance = g.phaseKey === "survival" ? 0.48 : g.phaseKey === "stability" ? 0.38 : g.phaseKey === "safety" ? 0.30 : 0.24;
+  const ev = maybePick(EVENTS, chance, g, g.recentEvents);
   if(ev){
     openEventModal({ title: ev.title, text: ev.text, onOk: ()=> ev.after(g) });
     return;
@@ -933,10 +1594,17 @@ function finalizeMonth(g){
   timelineItem("ETF Bewegung", mv.change, `Monatsrendite: ${mv.pct>=0?"+":""}${mv.pct}%`);
   if(g.balance < 0){
     g.redMonths += 1;
+    g.greenMonthsStreak = 0;
     g.social = clamp(g.social - 2, 0, 100);
     g.comfort = clamp(g.comfort - 1, 0, 100);
   } else {
+    g.greenMonthsStreak += 1;
     g.social = clamp(g.social + 1, 0, 100);
+  }
+  if(g.month % 3 === 0){
+    g.variable.food += 10;
+    g.variable.mobility += 5;
+    timelineInfo("Preisanstieg", "Einige Kosten steigen leicht.");
   }
   g.historyBalance.push(g.balance);
   g.historyEtf.push(g.buckets.etf);
@@ -955,6 +1623,11 @@ function nextMonth(){
   }
   g.month += 1;
   g.hasRunThisMonth = false;
+  if(g.month % 3 === 0){
+    g.variable.food += 10;
+    g.variable.mobility += 5;
+    timelineInfo("Preisanstieg", "Einige Lebenshaltungskosten steigen leicht.");
+  }
   el("btnNextMonth").disabled = true;
   timelineClear();
   timelineInfo(`Monat ${g.month}`, "Bereit? Jetzt wieder Einkommen, Kosten und Entscheidungen.");
@@ -1006,25 +1679,17 @@ function setView(view){
 function startGame(){
   const profile = readProfile();
   state.profile = profile;
-  if(typeof syncAvatarFromProfile === "function"){
-    syncAvatarFromProfile(profile);
-  } else if(typeof buildAvatarFromProfile === "function"){
-    avatarSalt = 0;
-    state.avatarData = buildAvatarFromProfile(profile);
-  }
+  avatarSalt = 0;
+  state.avatarData = buildAvatarFromProfile(profile);
   state.game = newGame(profile);
   setView("game");
   timelineClear();
   timelineInfo("Start", "Klick auf „Monat starten“. Dann siehst du alles Schritt für Schritt.");
   renderAll();
   requestAnimationFrame(() => {
-    if(state.game){
-      renderGameAvatar();
-      renderCharts(state.game);
-      renderProgressDots(state.game);
-      renderPhaseCard(state.game);
-      renderAchievements(state.game);
-    }
+    renderAll();
+    renderGameAvatar();
+    renderCharts(state.game);
   });
 }
 
@@ -1052,14 +1717,13 @@ function bind(){
   el("btnWithdrawCash")?.addEventListener("click", withdrawFromCash);
   el("btnSellEtf")?.addEventListener("click", sellEtf);
   el("btnTakeLoan")?.addEventListener("click", takeLoan);
-  el("actionToggle")?.addEventListener("click", () => {
-    const body = el("actionBody");
-    const chev = el("actionChevron");
-    if(!body) return;
-    const open = !body.classList.contains("hidden");
-    body.classList.toggle("hidden", open);
-    if(chev) chev.textContent = open ? "▾" : "▴";
-  });
+  el("actionToggle")?.addEventListener("click", toggleActionPanel);
+  el("actCancelSubs")?.addEventListener("click", cancelSubscriptions);
+  el("actSellClothes")?.addEventListener("click", sellClothes);
+  el("actSideJob")?.addEventListener("click", startSideJob);
+  el("actWG")?.addEventListener("click", moveToWG);
+  el("actRefi")?.addEventListener("click", refinanceLoan);
+  el("actEmergency")?.addEventListener("click", emergencyHelp);
   bindInterviewLive();
   bindTooltips();
   updateInterviewPreview();
