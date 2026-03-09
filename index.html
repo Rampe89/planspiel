@@ -274,38 +274,40 @@
             Ablauf: Einkommen → Kosten → Monatsübersicht → Plan → Entscheidung → Event → ETF.
           </div>
 
-          <div class="receiptCard" id="receiptCard">
-            <div class="receiptHead">
-              <strong>Monatsübersicht</strong>
-              <span class="receiptMonth" id="receiptMonth">Monat 1</span>
+          <div class="topGrid">
+            <div class="receiptCard" id="receiptCard">
+              <div class="receiptHead">
+                <strong>Monatsübersicht</strong>
+                <span class="receiptMonth" id="receiptMonth">Monat 1</span>
+              </div>
+              <div class="receiptBody" id="receiptBody">
+                Noch kein Monat gespielt.
+              </div>
+              <div class="receiptFoot" id="receiptFoot">
+                Erst Monat starten, dann erscheint hier der „Kassenbon“.
+              </div>
             </div>
-            <div class="receiptBody" id="receiptBody">
-              Noch kein Monat gespielt.
-            </div>
-            <div class="receiptFoot" id="receiptFoot">
-              Erst Monat starten, dann erscheint hier der „Kassenbon“.
+
+            <div class="charts">
+              <div class="chartCard">
+                <div class="chartHead">
+                  <strong>Kontostand</strong>
+                  <span class="chartTiny">12 Monate</span>
+                </div>
+                <canvas id="chartBalance" width="600" height="160"></canvas>
+              </div>
+
+              <div class="chartCard">
+                <div class="chartHead">
+                  <strong>ETF</strong>
+                  <span class="chartTiny">schwankt</span>
+                </div>
+                <canvas id="chartEtf" width="600" height="160"></canvas>
+              </div>
             </div>
           </div>
 
           <div class="timeline" id="gLog"></div>
-
-          <div class="charts">
-            <div class="chartCard">
-              <div class="chartHead">
-                <strong>Kontostand</strong>
-                <span class="chartTiny">12 Monate</span>
-              </div>
-              <canvas id="chartBalance" width="600" height="160"></canvas>
-            </div>
-
-            <div class="chartCard">
-              <div class="chartHead">
-                <strong>ETF</strong>
-                <span class="chartTiny">schwankt</span>
-              </div>
-              <canvas id="chartEtf" width="600" height="160"></canvas>
-            </div>
-          </div>
         </div>
 
         <div class="panel side">
@@ -319,6 +321,25 @@
                 <canvas id="gameAvatar" width="16" height="16" aria-label="Spiel Avatar"></canvas>
               </div>
               <div class="small" id="avatarMoodText">Deine Figur reagiert auf deine Lage im Spiel.</div>
+            </div>
+
+            <div class="cardBox actionCenter" id="actionCenter">
+              <button class="actionCenterHead" id="btnToggleActions" type="button" aria-expanded="true">
+                <span>Alltag anpassen</span>
+                <span class="actionChevron">▾</span>
+              </button>
+              <div class="actionCenterBody" id="actionCenterBody">
+                <div class="small actionCoach" id="advisorText">Kleine Stellschrauben können einen Monat retten.</div>
+                <div class="actionGrid">
+                  <button class="btn soft ghost" id="actCancelSubs" type="button">Abos kündigen</button>
+                  <button class="btn soft ghost" id="actSellClothes" type="button">Klamotten verkaufen</button>
+                  <button class="btn soft ghost" id="actSideJob" type="button">Nebenjob suchen</button>
+                  <button class="btn soft ghost" id="actWG" type="button">In WG ziehen</button>
+                  <button class="btn soft ghost" id="actRefi" type="button">Kredit umschulden</button>
+                  <button class="btn soft ghost" id="actEmergency" type="button">Notfallhilfe</button>
+                </div>
+                <div class="small" id="actionMeta">Maximal 2 Sofortaktionen pro Monat.</div>
+              </div>
             </div>
 
             <div class="cardBox">
